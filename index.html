@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Exhibition Place Wayfinding</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+    /* Calm muted OpenStreetMap basemap so the walking route and pins stand out clearly */
+    body.calm-map .leaflet-tile-pane {
+      filter: saturate(0.42) brightness(1.05) contrast(0.95);
+    }
+
+    /* Clean minimal title & legend card (top-left) */
+    .title-card {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
+      padding: 12px 15px;
+      color: #0f172a;
+      max-width: 310px;
+    }
+    .title-card h1 {
+      margin: 0 0 4px 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .route-metrics {
+      font-size: 12.5px;
+      color: #334155;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    .route-metrics strong {
+      color: #1d4ed8;
+    }
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11.5px;
+      color: #475569;
+    }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-start { background: #059669; }
+    .dot-end { background: #2563eb; }
+    .dot-turn { background: #d97706; }
+    .ring-swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 1.5px dashed #2563eb;
+      background: rgba(37, 99, 235, 0.08);
+      flex-shrink: 0;
+    }
+
+    /* Subtle top-right controls button (collapsed by default) */
+    .options-wrap {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .options-btn {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(15, 23, 42, 0.14);
+      border-radius: 9px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.1);
+      cursor: pointer;
+    }
+    .options-btn:hover {
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .options-drawer {
+      display: none;
+      width: 240px;
+      background: rgba(255, 255, 255, 0.97);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(15, 23, 42, 0.14);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+      padding: 12px 14px;
+      font-size: 12px;
+      color: #1e293b;
+    }
+    .options-drawer.open {
+      display: block;
+    }
+    .opt-section {
+      margin-bottom: 10px;
+    }
+    .opt-section:last-child {
+      margin-bottom: 0;
+    }
+    .opt-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .chip-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .chip {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .chip.active {
+      background: #1d4ed8;
+      border-color: #1d4ed8;
+      color: #ffffff;
+    }
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 5px;
+      cursor: pointer;
+    }
+    .check-row:last-child { margin-bottom: 0; }
+    .drawer-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .small-btn {
+      flex: 1;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #334155;
+      border-radius: 7px;
+      padding: 5px 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .small-btn:hover { background: #e2e8f0; }
+
+    /* Map pins & crisp labels */
+    .pin-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+    }
+    .pin-start { background: #059669; }
+    .pin-end { background: #2563eb; }
+    .pin-decision {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #d97706;
+      border: 3px solid #ffffff;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+    }
+    .endpoint-tooltip {
+      background: rgba(255, 255, 255, 0.97);
+      border: 1px solid rgba(15, 23, 42, 0.16);
+      border-radius: 8px;
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 12.5px;
+      padding: 5px 10px;
+      box-shadow: 0 3px 12px rgba(15, 23, 42, 0.14);
+    }
+    .route-pill {
+      display: inline-block;
+      width: max-content;
+      background: #1d4ed8;
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 11px;
+      white-space: nowrap;
+      box-shadow: 0 3px 10px rgba(29, 78, 216, 0.35);
+      transform: translate(0, -50%);
+    }
+    .straight-label {
+      display: inline-block;
+      width: max-content;
+      background: #1e293b;
+      color: #ffffff;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+      transform: translate(-50%, -50%);
+    }
+    .ring-edge-label {
+      display: inline-block;
+      width: max-content;
+      background: rgba(255, 255, 255, 0.94);
+      color: #275bb8;
+      border: 1px solid rgba(39, 91, 184, 0.45);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+      transform: translate(-50%, -50%);
+    }
+
+    /* Site walk observation card anchored cleanly to the left of the Nunavut Rd turn */
+    .obs-callout-wrap {
+      display: flex;
+      align-items: center;
+      width: max-content;
+      transform: translate(-100%, -50%);
+      pointer-events: auto;
+    }
+    .obs-leader {
+      width: 30px;
+      height: 2.5px;
+      background: #d97706;
+      flex-shrink: 0;
+    }
+    .obs-card {
+      width: 250px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1.5px solid #f59e0b;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+      padding: 11px 12px;
+      color: #0f172a;
+    }
+    .obs-tag {
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #b45309;
+      margin-bottom: 2px;
+    }
+    .obs-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .obs-photo-box {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .obs-photo-img {
+      width: 100%;
+      height: 125px;
+      object-fit: cover;
+      display: block;
+      cursor: pointer;
+    }
+    .obs-photo-empty {
+      border: 1.5px dashed #cbd5e1;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 14px 10px;
+      text-align: center;
+      font-size: 11.5px;
+      color: #64748b;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .obs-photo-empty:hover {
+      border-color: #d97706;
+      background: #fffbeb;
+      color: #92400e;
+    }
+    .obs-photo-actions {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      display: flex;
+      gap: 4px;
+    }
+    .obs-mini-btn {
+      background: rgba(15, 23, 42, 0.72);
+      color: #ffffff;
+      border: none;
+      border-radius: 5px;
+      font-size: 10px;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+    .obs-note {
+      font-size: 12px;
+      line-height: 1.45;
+      color: #1e293b;
+      outline: none;
+      border-radius: 6px;
+      padding: 3px 5px;
+      margin: -3px -5px;
+    }
+    .obs-note:focus {
+      background: #fffbeb;
+      box-shadow: inset 0 0 0 1px #f59e0b;
+    }
+  </style>
+</head>
+<body class="calm-map">
+  <div id="map"></div>
+
+  <div class="title-card">
+    <h1>Exhibition GO &rarr; BMO Field</h1>
+    <div class="route-metrics">
+      <strong id="walk-summary">~190 m walk (~3 min)</strong><br>
+      <span id="straight-summary">Manitoba Dr exit to NE gate on Nunavut Rd</span>
+    </div>
+    <div class="legend">
+      <div class="legend-row"><span class="dot dot-start"></span>Exhibition GO &mdash; South Exit (Manitoba Dr)</div>
+      <div class="legend-row"><span class="dot dot-end"></span><span id="legend-end">BMO Field &mdash; NE Gate (Nunavut Rd)</span></div>
+      <div class="legend-row"><span class="dot dot-turn"></span>Decision point &mdash; Nunavut Rd turn</div>
+      <div class="legend-row"><span class="ring-swatch"></span><span id="legend-rings">190 m radius from GO exit</span></div>
+    </div>
+  </div>
+
+  <div class="options-wrap">
+    <button id="options-btn" class="options-btn" type="button">Options</button>
+    <div id="options-drawer" class="options-drawer">
+      <div class="opt-section">
+        <div class="opt-label">190 m Radius Ring</div>
+        <div class="chip-group">
+          <button class="chip active" type="button" data-rings="start">GO Exit (190 m)</button>
+          <button class="chip" type="button" data-rings="both">Both</button>
+          <button class="chip" type="button" data-rings="off">Off</button>
+        </div>
+      </div>
+
+      <div class="opt-section">
+        <div class="opt-label">Destination Gate</div>
+        <div class="chip-group">
+          <button class="chip active" type="button" data-gate="neGate">NE Gate (Nunavut Rd)</button>
+          <button class="chip" type="button" data-gate="gate1">Gate 1 (North)</button>
+          <button class="chip" type="button" data-gate="gate3">Gate 3 (SE)</button>
+        </div>
+      </div>
+
+      <div class="opt-section">
+        <div class="opt-label">Map Style</div>
+        <div class="chip-group">
+          <button class="chip active" type="button" data-style="clean">Clean OSM</button>
+          <button class="chip" type="button" data-style="standard">Standard OSM</button>
+        </div>
+      </div>
+
+      <div class="opt-section">
+        <div class="opt-label">Overlays</div>
+        <label class="check-row"><input id="chk-obs" type="checkbox" checked> Site observation card</label>
+        <label class="check-row"><input id="chk-straight" type="checkbox"> Straight-line span</label>
+      </div>
+
+      <div class="drawer-actions">
+        <button id="fit-btn" class="small-btn" type="button">Recenter</button>
+        <button id="reset-btn" class="small-btn" type="button">Reset Pins</button>
+      </div>
+    </div>
+  </div>
+
+  <input id="photo-file-input" type="file" accept="image/*" style="display:none">
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const START_DEFAULT = [43.63530, -79.41876];     // Exhibition GO — South Exit (Manitoba Dr & Nova Scotia Ave)
+    const DECISION_DEFAULT = [43.63428, -79.41822];  // Nova Scotia Ave / Nunavut Rd turn
+    const GATE_PRESETS = {
+      neGate: { name: 'BMO Field — NE Gate (Nunavut Rd)', coords: [43.63408, -79.41760] },
+      gate1: { name: 'BMO Field — Gate 1 (North)', coords: [43.634016, -79.418677] },
+      gate3: { name: 'BMO Field — Gate 3 (SE)', coords: [43.632760, -79.417474] }
+    };
+
+    const RING_RADIUS_METERS = 190;
+    const WALK_SPEED_MPS = 1.08; // ~3 min for 190 m (matches Google Maps pedestrian pace)
+    const STORAGE_KEY_NOTE = 'explace_wayfinding_obs_note_v1';
+    const STORAGE_KEY_PHOTO = 'explace_wayfinding_obs_photo_v1';
+    const DEFAULT_OBS_NOTE = 'At the Nunavut Rd turn, the path curves toward BMO Field, but individual gate signage is not yet visible from the sidewalk.';
+
+    const map = L.map('map', { zoomControl: false }).setView([43.6347, -79.4185], 17);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+    L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+
+    // Genuine OpenStreetMap tiles (no API key required); CSS class .calm-map softens colors by default
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Layers
+    const routeGroup = L.featureGroup().addTo(map);
+    const observationGroup = L.featureGroup().addTo(map);
+    const straightGroup = L.featureGroup();
+    const ringsGroup = L.featureGroup().addTo(map);
+
+    const routeCasing = L.polyline([], { color: '#ffffff', weight: 11, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(routeGroup);
+    const routeLine = L.polyline([], { color: '#2563eb', weight: 6.5, opacity: 0.96, dashArray: '1 12', lineCap: 'round' }).addTo(routeGroup);
+    const routeMidBadge = L.marker([43.6348, -79.4184], { interactive: false, zIndexOffset: 300 }).addTo(routeGroup);
+
+    const straightLine = L.polyline([START_DEFAULT, GATE_PRESETS.neGate.coords], {
+      color: '#1e293b',
+      weight: 2,
+      dashArray: '5 6',
+      opacity: 0.85
+    }).addTo(straightGroup);
+    const straightBadge = L.marker([43.6347, -79.4182], { interactive: false }).addTo(straightGroup);
+
+    const ringStyle = {
+      radius: RING_RADIUS_METERS,
+      color: '#275bb8',
+      weight: 2,
+      fill: true,
+      fillColor: '#275bb8',
+      fillOpacity: 0.05,
+      dashArray: '6 5'
+    };
+    const startRing = L.circle(START_DEFAULT, ringStyle)
+      .bindTooltip('Exhibition GO — South Exit · 190 m radius')
+      .addTo(ringsGroup);
+    const endRing = L.circle(GATE_PRESETS.neGate.coords, ringStyle)
+      .bindTooltip('BMO Field — NE Gate · 190 m radius');
+
+    function getRingEastEdge(centerLatLng) {
+      // 190 m east at lat ~43.635° (1° lng ≈ 80,570 m)
+      const dLng = RING_RADIUS_METERS / (111320 * Math.cos(centerLatLng[0] * Math.PI / 180));
+      return [centerLatLng[0], centerLatLng[1] + dLng];
+    }
+
+    const ringEdgeLabel = L.marker(getRingEastEdge(START_DEFAULT), {
+      interactive: false,
+      icon: L.divIcon({
+        className: '',
+        html: '<div class="ring-edge-label">190 m radius</div>',
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      })
+    }).addTo(ringsGroup);
+
+    let ringsMode = 'start';
+
+    // Pins
+    const startIcon = L.divIcon({ className: '', html: '<div class="pin-dot pin-start"></div>', iconSize: [24, 24], iconAnchor: [12, 12] });
+    const endIcon = L.divIcon({ className: '', html: '<div class="pin-dot pin-end"></div>', iconSize: [24, 24], iconAnchor: [12, 12] });
+    const decisionIcon = L.divIcon({ className: '', html: '<div class="pin-decision">!</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
+
+    const startMarker = L.marker(START_DEFAULT, { icon: startIcon, draggable: true, zIndexOffset: 400 })
+      .bindTooltip('Exhibition GO — South Exit (Manitoba Dr)', { permanent: true, direction: 'top', offset: [0, -12], className: 'endpoint-tooltip' })
+      .addTo(map);
+
+    const endMarker = L.marker(GATE_PRESETS.neGate.coords, { icon: endIcon, draggable: true, zIndexOffset: 400 })
+      .bindTooltip(GATE_PRESETS.neGate.name, { permanent: true, direction: 'bottom', offset: [34, 12], className: 'endpoint-tooltip' })
+      .addTo(map);
+
+    const decisionMarker = L.marker(DECISION_DEFAULT, { icon: decisionIcon, draggable: true, zIndexOffset: 500 })
+      .addTo(observationGroup);
+
+    // Observation callout card (anchored to the left of the Nunavut Rd turn so it never blocks the eastern leg)
+    let obsCardMarker = null;
+    let savedNote = localStorage.getItem(STORAGE_KEY_NOTE) || DEFAULT_OBS_NOTE;
+    let savedPhoto = localStorage.getItem(STORAGE_KEY_PHOTO) || '';
+
+    function buildCardHtml() {
+      const photoHtml = savedPhoto
+        ? `<div class="obs-photo-box">
+             <img src="${savedPhoto}" alt="Nunavut Road turn observation" class="obs-photo-img" id="obs-photo-trigger">
+             <div class="obs-photo-actions">
+               <button type="button" class="obs-mini-btn" id="obs-change-photo">Replace</button>
+               <button type="button" class="obs-mini-btn" id="obs-remove-photo">Remove</button>
+             </div>
+           </div>`
+        : `<div class="obs-photo-empty" id="obs-photo-trigger">+ Click to add site photo</div>`;
+
+      return `
+        <div class="obs-callout-wrap">
+          <div class="obs-card">
+            <div class="obs-tag">Site Walk Observation</div>
+            <div class="obs-title">Turn at Nunavut Road</div>
+            ${photoHtml}
+            <div class="obs-note" id="obs-note-editable" contenteditable="true" spellcheck="true"></div>
+          </div>
+          <div class="obs-leader"></div>
+        </div>
+      `;
+    }
+
+    function renderObservationCard() {
+      const pos = decisionMarker.getLatLng();
+      if (obsCardMarker) observationGroup.removeLayer(obsCardMarker);
+
+      const cardIcon = L.divIcon({
+        className: '',
+        html: buildCardHtml(),
+        iconSize: [0, 0],
+        iconAnchor: [13, 0]
+      });
+
+      obsCardMarker = L.marker(pos, { icon: cardIcon, interactive: true, zIndexOffset: 450 }).addTo(observationGroup);
+
+      setTimeout(() => {
+        const el = obsCardMarker.getElement();
+        if (!el) return;
+        L.DomEvent.disableClickPropagation(el);
+        L.DomEvent.disableScrollPropagation(el);
+
+        const noteEl = el.querySelector('#obs-note-editable');
+        if (noteEl) {
+          noteEl.textContent = savedNote;
+          noteEl.addEventListener('input', () => {
+            savedNote = noteEl.textContent.trim();
+            localStorage.setItem(STORAGE_KEY_NOTE, savedNote);
+          });
+        }
+
+        const trigger = el.querySelector('#obs-photo-trigger');
+        if (trigger) trigger.addEventListener('click', () => document.getElementById('photo-file-input').click());
+
+        const changeBtn = el.querySelector('#obs-change-photo');
+        if (changeBtn) changeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          document.getElementById('photo-file-input').click();
+        });
+
+        const removeBtn = el.querySelector('#obs-remove-photo');
+        if (removeBtn) removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          savedPhoto = '';
+          localStorage.removeItem(STORAGE_KEY_PHOTO);
+          renderObservationCard();
+        });
+      }, 0);
+    }
+
+    document.getElementById('photo-file-input').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        savedPhoto = reader.result;
+        try { localStorage.setItem(STORAGE_KEY_PHOTO, savedPhoto); } catch (_) {}
+        renderObservationCard();
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+
+    // Route & geometry helpers
+    let routeCoords = [START_DEFAULT, GATE_PRESETS.neGate.coords];
+
+    function getMidpointOnPolyline(coords) {
+      const dists = [0];
+      for (let i = 1; i < coords.length; i++) {
+        dists.push(dists[i - 1] + map.distance(coords[i - 1], coords[i]));
+      }
+      const total = dists[dists.length - 1];
+      const half = total * 0.42;
+      for (let i = 1; i < coords.length; i++) {
+        if (dists[i] >= half) {
+          const seg = dists[i] - dists[i - 1];
+          const t = seg > 0 ? (half - dists[i - 1]) / seg : 0;
+          return {
+            total,
+            point: [
+              coords[i - 1][0] + (coords[i][0] - coords[i - 1][0]) * t,
+              coords[i - 1][1] + (coords[i][1] - coords[i - 1][1]) * t
+            ]
+          };
+        }
+      }
+      return { total, point: coords[0] };
+    }
+
+    function updateStraightAndRings() {
+      const a = startMarker.getLatLng();
+      const b = endMarker.getLatLng();
+      const direct = Math.round(map.distance(a, b));
+      document.getElementById('straight-summary').textContent = `${direct} m straight-line (Manitoba Dr exit to gate)`;
+
+      startRing.setLatLng(a);
+      endRing.setLatLng(b);
+      ringEdgeLabel.setLatLng(getRingEastEdge([a.lat, a.lng]));
+      straightLine.setLatLngs([a, b]);
+      straightBadge.setLatLng([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2]);
+      straightBadge.setIcon(L.divIcon({
+        className: '',
+        html: `<div class="straight-label">${direct} m straight-line</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      }));
+    }
+
+    function fitCleanView() {
+      if (ringsMode === 'both') {
+        map.fitBounds(ringsGroup.getBounds(), { padding: [26, 26], maxZoom: 17 });
+        return;
+      }
+      if (ringsMode === 'start') {
+        const bounds = startRing.getBounds().extend(endMarker.getLatLng());
+        map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
+        return;
+      }
+      const bounds = L.latLngBounds(routeCoords);
+      bounds.extend(startMarker.getLatLng());
+      bounds.extend(endMarker.getLatLng());
+      bounds.extend(decisionMarker.getLatLng());
+      bounds.extend([decisionMarker.getLatLng().lat, decisionMarker.getLatLng().lng - 0.0020]);
+      map.fitBounds(bounds, { paddingTopLeft: [45, 95], paddingBottomRight: [60, 75], maxZoom: 18 });
+    }
+
+    async function fetchWalkingRoute(shouldFit) {
+      const a = startMarker.getLatLng();
+      const b = endMarker.getLatLng();
+      updateStraightAndRings();
+
+      const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const geom = data.routes && data.routes[0] && data.routes[0].geometry;
+        if (!geom || geom.coordinates.length < 2) throw new Error();
+        const latLngs = geom.coordinates.map(([lng, lat]) => [lat, lng]);
+        if (map.distance([a.lat, a.lng], latLngs[0]) <= 20 && map.distance([a.lat, a.lng], latLngs[0]) > 2) latLngs.unshift([a.lat, a.lng]);
+        if (map.distance([b.lat, b.lng], latLngs[latLngs.length - 1]) <= 20 && map.distance([b.lat, b.lng], latLngs[latLngs.length - 1]) > 2) latLngs.push([b.lat, b.lng]);
+        routeCoords = latLngs;
+      } catch (_) {
+        clearTimeout(timer);
+        routeCoords = [[a.lat, a.lng], [b.lat, b.lng]];
+      }
+
+      routeCasing.setLatLngs(routeCoords);
+      routeLine.setLatLngs(routeCoords);
+
+      const { total, point } = getMidpointOnPolyline(routeCoords);
+      const rounded = Math.round(total);
+      const mins = Math.max(1, Math.round((total / WALK_SPEED_MPS) / 60));
+      document.getElementById('walk-summary').textContent = `${rounded} m walk (~${mins} min)`;
+
+      routeMidBadge.setLatLng(point);
+      routeMidBadge.setIcon(L.divIcon({
+        className: '',
+        html: `<div class="route-pill">${rounded} m &middot; ~${mins} min</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [-16, 0]
+      }));
+
+      if (shouldFit) fitCleanView();
+    }
+
+    // Options drawer interactions
+    const optionsBtn = document.getElementById('options-btn');
+    const optionsDrawer = document.getElementById('options-drawer');
+    optionsBtn.addEventListener('click', () => optionsDrawer.classList.toggle('open'));
+
+    document.querySelectorAll('.chip[data-gate]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = GATE_PRESETS[btn.dataset.gate];
+        if (!preset) return;
+        document.querySelectorAll('.chip[data-gate]').forEach((b) => b.classList.toggle('active', b === btn));
+        endMarker.setLatLng(preset.coords);
+        endMarker.setTooltipContent(preset.name);
+        document.getElementById('legend-end').textContent = preset.name;
+        fetchWalkingRoute(true);
+      });
+    });
+
+    document.querySelectorAll('.chip[data-style]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.chip[data-style]').forEach((b) => b.classList.toggle('active', b === btn));
+        document.body.classList.toggle('calm-map', btn.dataset.style !== 'standard');
+      });
+    });
+
+    document.querySelectorAll('.chip[data-rings]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        ringsMode = btn.dataset.rings;
+        document.querySelectorAll('.chip[data-rings]').forEach((b) => b.classList.toggle('active', b === btn));
+        ringsGroup.clearLayers();
+        if (ringsMode === 'both') {
+          startRing.addTo(ringsGroup);
+          endRing.addTo(ringsGroup);
+          ringEdgeLabel.addTo(ringsGroup);
+          if (!map.hasLayer(ringsGroup)) ringsGroup.addTo(map);
+          document.getElementById('legend-rings').textContent = '190 m radius (exit & gate)';
+        } else if (ringsMode === 'start') {
+          startRing.addTo(ringsGroup);
+          ringEdgeLabel.addTo(ringsGroup);
+          if (!map.hasLayer(ringsGroup)) ringsGroup.addTo(map);
+          document.getElementById('legend-rings').textContent = '190 m radius from GO exit';
+        } else {
+          map.removeLayer(ringsGroup);
+          document.getElementById('legend-rings').textContent = '190 m radius (hidden)';
+        }
+        fitCleanView();
+      });
+    });
+
+    document.getElementById('chk-obs').addEventListener('change', (e) => {
+      if (e.target.checked) observationGroup.addTo(map); else map.removeLayer(observationGroup);
+    });
+    document.getElementById('chk-straight').addEventListener('change', (e) => {
+      if (e.target.checked) straightGroup.addTo(map); else map.removeLayer(straightGroup);
+    });
+
+    document.getElementById('fit-btn').addEventListener('click', fitCleanView);
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      document.querySelectorAll('.chip[data-gate]').forEach((b) => b.classList.toggle('active', b.dataset.gate === 'neGate'));
+      startMarker.setLatLng(START_DEFAULT);
+      endMarker.setLatLng(GATE_PRESETS.neGate.coords);
+      endMarker.setTooltipContent(GATE_PRESETS.neGate.name);
+      document.getElementById('legend-end').textContent = GATE_PRESETS.neGate.name;
+      decisionMarker.setLatLng(DECISION_DEFAULT);
+      renderObservationCard();
+      fetchWalkingRoute(true);
+    });
+
+    startMarker.on('drag', updateStraightAndRings);
+    endMarker.on('drag', updateStraightAndRings);
+    startMarker.on('dragend', () => fetchWalkingRoute(false));
+    endMarker.on('dragend', () => {
+      document.querySelectorAll('.chip[data-gate]').forEach((b) => b.classList.remove('active'));
+      fetchWalkingRoute(false);
+    });
+    decisionMarker.on('drag', () => {
+      if (obsCardMarker) obsCardMarker.setLatLng(decisionMarker.getLatLng());
+    });
+
+    renderObservationCard();
+    fetchWalkingRoute(true);
+  </script>
+</body>
+</html>
