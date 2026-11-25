@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Exhibition Place Wayfinding</title>
+  <title>Environmental Wayfinding Walkthrough</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
   <style>
     * { box-sizing: border-box; }
@@ -11,137 +11,186 @@
       margin: 0;
       padding: 0;
       height: 100%;
+      background: #f8fafc;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     #map {
       height: 100vh;
       width: 100%;
-    }
-    /* Calm muted OpenStreetMap basemap so the walking route and pins stand out clearly */
-    body.calm-map .leaflet-tile-pane {
-      filter: saturate(0.42) brightness(1.05) contrast(0.95);
+      background: #f8fafc;
     }
 
-    /* Clean minimal title & legend card (top-left) */
-    .title-card {
+    /* Whisper-quiet minimalist map background so only the route, 190 m ring, and pins stand out */
+    body.minimal-map .leaflet-tile-pane {
+      filter: grayscale(1) brightness(1.16) contrast(0.72);
+      opacity: 0.72;
+    }
+    body.clean-view .interactive-only,
+    body.clean-view .leaflet-control-zoom {
+      display: none !important;
+    }
+
+    /* Unified responsive top bar — guarantees zero overlap between route info and toolbar */
+    .top-bar {
       position: fixed;
-      top: 16px;
-      left: 16px;
+      top: 12px;
+      left: 12px;
+      right: 12px;
       z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .top-left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: auto;
+      max-width: 315px;
+      flex-shrink: 1;
+    }
+    .top-pill {
       background: rgba(255, 255, 255, 0.96);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(15, 23, 42, 0.12);
       border-radius: 12px;
-      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
-      padding: 12px 15px;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.09);
+      padding: 9px 12px;
       color: #0f172a;
-      max-width: 310px;
     }
-    .title-card h1 {
-      margin: 0 0 4px 0;
-      font-size: 15px;
+    .top-pill h1 {
+      margin: 0 0 5px 0;
+      font-size: 13.5px;
       font-weight: 700;
       letter-spacing: -0.01em;
     }
-    .route-metrics {
-      font-size: 12.5px;
-      color: #334155;
-      margin-bottom: 8px;
-      line-height: 1.4;
-    }
-    .route-metrics strong {
-      color: #1d4ed8;
-    }
-    .legend {
+    .measure-list {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      font-size: 11.5px;
-      color: #475569;
+      gap: 3px;
+      font-size: 11px;
+      line-height: 1.3;
+      color: #334155;
+      margin-bottom: 6px;
     }
-    .legend-row {
+    .measure-row {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
     }
-    .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
+    .measure-route-icon {
+      width: 16px;
+      height: 0;
+      border-top: 3px dotted #2563eb;
       flex-shrink: 0;
     }
-    .dot-start { background: #059669; }
-    .dot-end { background: #2563eb; }
-    .dot-turn { background: #d97706; }
-    .ring-swatch {
-      width: 11px;
-      height: 11px;
+    .measure-radius-icon {
+      width: 12px;
+      height: 12px;
+      margin: 0 2px;
       border-radius: 50%;
-      border: 1.5px dashed #2563eb;
-      background: rgba(37, 99, 235, 0.08);
+      border: 1.5px dashed #475569;
+      background: rgba(71, 85, 105, 0.08);
       flex-shrink: 0;
     }
+    .measure-route-val { color: #1d4ed8; font-weight: 700; }
+    .measure-radius-val { color: #334155; font-weight: 700; }
 
-    /* Subtle top-right controls button (collapsed by default) */
-    .options-wrap {
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      z-index: 1000;
+    /* Stop color legend (explains Green 1, Blue 2 & 4, Orange 3) */
+    .stop-legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding-top: 6px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 10.5px;
+      color: #475569;
+    }
+    .stop-key {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .stop-key-dot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .sk-green { background: #059669; }
+    .sk-blue { background: #2563eb; }
+    .sk-orange { background: #d97706; }
+
+    /* Top-right minimal controls */
+    .top-right-wrap {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
       gap: 8px;
+      pointer-events: auto;
+      flex-shrink: 0;
+      max-width: calc(100% - 280px);
     }
-    .options-btn {
+    .top-btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 5px;
+    }
+    .top-btn {
       background: rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(15, 23, 42, 0.14);
+      border: 1px solid rgba(15, 23, 42, 0.12);
       border-radius: 9px;
-      padding: 7px 12px;
-      font-size: 12px;
+      padding: 6px 9.5px;
+      font-size: 11.5px;
       font-weight: 600;
       color: #334155;
-      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.1);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
       cursor: pointer;
     }
-    .options-btn:hover {
-      background: #f8fafc;
-      color: #0f172a;
+    .top-btn:hover { background: #ffffff; color: #0f172a; }
+    .top-btn.playing {
+      background: #059669;
+      border-color: #059669;
+      color: #ffffff;
     }
     .options-drawer {
       display: none;
-      width: 240px;
+      width: 235px;
       background: rgba(255, 255, 255, 0.97);
       backdrop-filter: blur(8px);
-      border: 1px solid rgba(15, 23, 42, 0.14);
+      border: 1px solid rgba(15, 23, 42, 0.12);
       border-radius: 12px;
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
-      padding: 12px 14px;
+      padding: 12px 13px;
       font-size: 12px;
       color: #1e293b;
     }
-    .options-drawer.open {
-      display: block;
-    }
-    .opt-section {
-      margin-bottom: 10px;
-    }
-    .opt-section:last-child {
-      margin-bottom: 0;
-    }
+    .options-drawer.open { display: block; }
+    .opt-section { margin-bottom: 10px; }
+    .opt-section:last-child { margin-bottom: 0; }
     .opt-label {
+      display: flex;
+      justify-content: space-between;
       font-size: 10.5px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.04em;
       color: #64748b;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
-    .chip-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
+    .opt-label strong { color: #1d4ed8; }
+    .chip-group { display: flex; flex-wrap: wrap; gap: 5px; }
     .chip {
       border: 1px solid #cbd5e1;
       background: #ffffff;
@@ -157,65 +206,244 @@
       border-color: #1d4ed8;
       color: #ffffff;
     }
+    .radius-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 6px;
+    }
+    .radius-slider { flex: 1; accent-color: #1d4ed8; cursor: pointer; }
+    .snap-btn {
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 10.5px;
+      font-weight: 700;
+      cursor: pointer;
+    }
     .check-row {
       display: flex;
       align-items: center;
       gap: 7px;
-      margin-bottom: 5px;
+      margin-bottom: 4px;
       cursor: pointer;
     }
     .check-row:last-child { margin-bottom: 0; }
-    .drawer-actions {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
+
+    /* Compact, uncluttered Walkthrough Card (bottom-left) */
+    .story-card {
+      position: fixed;
+      left: 16px;
+      bottom: 24px;
+      z-index: 1000;
+      width: 295px;
+      max-width: calc(100vw - 32px);
+      background: rgba(255, 255, 255, 0.97);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      border-radius: 14px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+      padding: 13px 14px;
+      color: #0f172a;
     }
-    .small-btn {
+    .story-card.decision-step {
+      border: 1.5px solid #f59e0b;
+    }
+
+    .stepper {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .step-pill {
       flex: 1;
-      border: 1px solid #cbd5e1;
-      background: #f8fafc;
+      height: 4px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+    .step-pill.done { background: #059669; }
+    .step-pill.active { background: #1d4ed8; }
+    .step-pill.decision.active { background: #d97706; }
+
+    .story-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .story-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0;
+      line-height: 1.25;
+    }
+    .story-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
       color: #334155;
-      border-radius: 7px;
-      padding: 5px 8px;
-      font-size: 11.5px;
+      white-space: nowrap;
+    }
+    .story-card.decision-step .story-badge {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    /* Compact optional photo slot */
+    .story-photo-wrap {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .story-photo-img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      display: block;
+      cursor: zoom-in;
+    }
+    .story-photo-empty {
+      border: 1.5px dashed #cbd5e1;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 11px;
+      color: #64748b;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .story-photo-empty:hover {
+      border-color: #1d4ed8;
+      color: #1d4ed8;
+      background: #eff6ff;
+    }
+    .story-photo-empty.dragover {
+      border-color: #059669;
+      background: #ecfdf5;
+      color: #065f46;
+    }
+    /* Ensure OpenStreetMap attribution stays crisp and legible */
+    .leaflet-control-attribution {
+      background: rgba(255, 255, 255, 0.92) !important;
+      font-size: 11px !important;
+      color: #334155 !important;
+      padding: 2px 7px !important;
+      border-top-left-radius: 6px;
+    }
+    .story-photo-actions {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      display: flex;
+      gap: 4px;
+    }
+    .mini-btn {
+      background: rgba(15, 23, 42, 0.72);
+      color: #ffffff;
+      border: none;
+      border-radius: 5px;
+      font-size: 10px;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+
+    /* Single concise editable instruction/observation sentence */
+    .story-line {
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #334155;
+      margin: 0 0 11px 0;
+      outline: none;
+      border-radius: 6px;
+      padding: 3px 5px;
+      margin-left: -5px;
+      margin-right: -5px;
+    }
+    .story-line:focus {
+      background: #f8fafc;
+      box-shadow: inset 0 0 0 1px #93c5fd;
+    }
+
+    .story-nav {
+      display: flex;
+      gap: 7px;
+    }
+    .nav-btn {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      border-radius: 9px;
+      padding: 7px 12px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
     }
-    .small-btn:hover { background: #e2e8f0; }
-
-    /* Map pins & crisp labels */
-    .pin-dot {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      border: 3px solid #ffffff;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+    .nav-btn:hover:not(:disabled) { background: #f1f5f9; color: #0f172a; }
+    .nav-btn:disabled { opacity: 0.4; cursor: default; }
+    .nav-btn.primary {
+      flex: 1;
+      background: #1d4ed8;
+      border-color: #1d4ed8;
+      color: #ffffff;
     }
-    .pin-start { background: #059669; }
-    .pin-end { background: #2563eb; }
-    .pin-decision {
-      width: 24px;
-      height: 24px;
+    .nav-btn.primary:hover { background: #1e40af; }
+
+    /* Clean map pins */
+    .stop-pin {
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
-      background: #d97706;
       border: 3px solid #ffffff;
       color: #ffffff;
       font-weight: 800;
-      font-size: 13px;
+      font-size: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+      box-shadow: 0 2px 9px rgba(15, 23, 42, 0.32);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stop-pin:hover { transform: scale(1.12); }
+    .stop-pin.start { background: #059669; }
+    .stop-pin.mid { background: #2563eb; }
+    .stop-pin.decision { background: #d97706; }
+    .stop-pin.end { background: #1d4ed8; }
+    .stop-pin.active {
+      transform: scale(1.24);
+      box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.25), 0 3px 10px rgba(15, 23, 42, 0.35);
+    }
+    .stop-pin.decision.active {
+      box-shadow: 0 0 0 6px rgba(217, 119, 6, 0.32), 0 3px 10px rgba(15, 23, 42, 0.35);
+    }
+
+    .walker-dot {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #059669;
+      border: 3px solid #ffffff;
+      box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.32);
     }
     .endpoint-tooltip {
-      background: rgba(255, 255, 255, 0.97);
-      border: 1px solid rgba(15, 23, 42, 0.16);
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(15, 23, 42, 0.14);
       border-radius: 8px;
       color: #0f172a;
       font-weight: 700;
-      font-size: 12.5px;
-      padding: 5px 10px;
-      box-shadow: 0 3px 12px rgba(15, 23, 42, 0.14);
+      font-size: 12px;
+      padding: 4px 9px;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
     }
     .route-pill {
       display: inline-block;
@@ -228,505 +456,1296 @@
       font-weight: 700;
       padding: 4px 11px;
       white-space: nowrap;
-      box-shadow: 0 3px 10px rgba(29, 78, 216, 0.35);
+      box-shadow: 0 3px 10px rgba(29, 78, 216, 0.3);
       transform: translate(0, -50%);
-    }
-    .straight-label {
-      display: inline-block;
-      width: max-content;
-      background: #1e293b;
-      color: #ffffff;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 8px;
-      white-space: nowrap;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
-      transform: translate(-50%, -50%);
     }
     .ring-edge-label {
       display: inline-block;
       width: max-content;
-      background: rgba(255, 255, 255, 0.94);
-      color: #275bb8;
-      border: 1px solid rgba(39, 91, 184, 0.45);
+      background: rgba(255, 255, 255, 0.96);
+      color: #334155;
+      border: 1.5px dashed #475569;
       border-radius: 999px;
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 700;
-      padding: 2px 8px;
+      padding: 2px 9px;
       white-space: nowrap;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
       transform: translate(-50%, -50%);
     }
 
-    /* Site walk observation card anchored cleanly to the left of the Nunavut Rd turn */
-    .obs-callout-wrap {
-      display: flex;
+    /* Fullscreen photo lightbox */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(4px);
       align-items: center;
-      width: max-content;
-      transform: translate(-100%, -50%);
-      pointer-events: auto;
+      justify-content: center;
+      padding: 24px;
+      cursor: zoom-out;
     }
-    .obs-leader {
-      width: 30px;
-      height: 2.5px;
-      background: #d97706;
+    .lightbox.open { display: flex; }
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: 12px;
+    }
+
+    /* =====================================================================
+       ENVIRONMENTAL & SPATIAL ANALYSIS SECTION
+       ===================================================================== */
+    body.placing-verify-marker #map { cursor: crosshair; }
+
+    .top-btn.analysis-active {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #ffffff;
+    }
+    .layer-count-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 17px;
+      height: 17px;
+      padding: 0 5px;
+      margin-left: 5px;
+      border-radius: 999px;
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .layer-count-pill.hidden { display: none; }
+
+    /* Analytical Layer Control Panel */
+    .analysis-panel {
+      display: none;
+      width: 316px;
+      max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 110px);
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.97);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(15, 23, 42, 0.14);
+      border-radius: 14px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+      padding: 14px 15px;
+      color: #0f172a;
+      font-size: 12px;
+    }
+    .analysis-panel.open { display: block; }
+    .analysis-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .analysis-header h2 {
+      margin: 0 0 2px 0;
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .analysis-header p {
+      margin: 0;
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.35;
+    }
+    .panel-close-btn {
+      border: none;
+      background: #f1f5f9;
+      color: #475569;
+      border-radius: 6px;
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
       flex-shrink: 0;
     }
-    .obs-card {
-      width: 250px;
-      background: rgba(255, 255, 255, 0.98);
-      border: 1.5px solid #f59e0b;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
-      padding: 11px 12px;
-      color: #0f172a;
-    }
-    .obs-tag {
-      font-size: 9.5px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: #b45309;
-      margin-bottom: 2px;
-    }
-    .obs-title {
-      font-size: 13px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .obs-photo-box {
-      position: relative;
-      border-radius: 8px;
-      overflow: hidden;
-      margin-bottom: 8px;
-    }
-    .obs-photo-img {
-      width: 100%;
-      height: 125px;
-      object-fit: cover;
-      display: block;
-      cursor: pointer;
-    }
-    .obs-photo-empty {
-      border: 1.5px dashed #cbd5e1;
-      background: #f8fafc;
-      border-radius: 8px;
-      padding: 14px 10px;
-      text-align: center;
-      font-size: 11.5px;
-      color: #64748b;
-      cursor: pointer;
-      margin-bottom: 8px;
-    }
-    .obs-photo-empty:hover {
-      border-color: #d97706;
-      background: #fffbeb;
-      color: #92400e;
-    }
-    .obs-photo-actions {
-      position: absolute;
-      top: 5px;
-      right: 5px;
+    .panel-close-btn:hover { background: #e2e8f0; color: #0f172a; }
+
+    .layer-list {
       display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin-bottom: 11px;
+    }
+    .layer-toggle {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      padding: 8px 9px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #ffffff;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .layer-toggle:hover { background: #f8fafc; }
+    .layer-toggle.on-pedestrian { border-color: #93c5fd; background: #eff6ff; }
+    .layer-toggle.on-landmarks { border-color: #fcd34d; background: #fffbeb; }
+    .layer-toggle.on-environmental { border-color: #6ee7b7; background: #ecfdf5; }
+    .layer-toggle.on-barriers { border-color: #fca5a5; background: #fef2f2; }
+
+    .layer-toggle input[type="checkbox"] {
+      margin-top: 2px;
+      cursor: pointer;
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+    }
+    .layer-swatch {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 800;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .swatch-blue { background: #2563eb; border-radius: 50%; }
+    .swatch-orange { background: #d97706; transform: rotate(45deg); width: 18px; height: 18px; margin: 3px 2px 0 2px; border-radius: 3px; }
+    .swatch-orange span { transform: rotate(-45deg); display: block; font-size: 10px; }
+    .swatch-green { background: #059669; border-radius: 5px; }
+    .swatch-red { background: #dc2626; clip-path: polygon(50% 6%, 96% 92%, 4% 92%); border-radius: 0; padding-top: 4px; font-size: 10px; }
+
+    .layer-meta { flex: 1; min-width: 0; }
+    .layer-name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.25;
+    }
+    .layer-framework {
+      font-size: 10.5px;
+      color: #475569;
+      margin-top: 1px;
+    }
+    .layer-pattern-line {
+      height: 0;
+      margin-top: 5px;
+      width: 58px;
+    }
+    .pat-blue { border-top: 3px dashed #2563eb; }
+    .pat-orange { border-top: 2.5px dotted #d97706; }
+    .pat-green { border-top: 3px solid #059669; }
+    .pat-red { border-top: 3px dashed #dc2626; }
+
+    .analysis-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .analysis-btn {
+      flex: 1;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #334155;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .analysis-btn:hover { background: #e2e8f0; color: #0f172a; }
+    .analysis-btn.accent {
+      background: #0f172a;
+      border-color: #0f172a;
+      color: #ffffff;
+    }
+    .analysis-btn.accent:hover { background: #1e293b; }
+
+    /* Dynamic Colour-Coded Legend inside panel & compact strip */
+    .dynamic-legend {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 9px;
+      margin-top: 4px;
+    }
+    .legend-heading {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    .legend-empty {
+      font-size: 11px;
+      color: #64748b;
+      font-style: italic;
+    }
+    .legend-items {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .legend-entry {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #1e293b;
+    }
+    .legend-symbol-tag {
+      font-weight: 800;
+      font-size: 11px;
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .legend-status-key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+      padding-top: 7px;
+      border-top: 1px dashed #e2e8f0;
+      font-size: 10.5px;
+      color: #475569;
+    }
+    .status-dot-key {
+      display: inline-flex;
+      align-items: center;
       gap: 4px;
     }
-    .obs-mini-btn {
-      background: rgba(15, 23, 42, 0.72);
-      color: #ffffff;
-      border: none;
-      border-radius: 5px;
-      font-size: 10px;
-      padding: 2px 6px;
-      cursor: pointer;
+    .key-solid {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #334155;
+      display: inline-block;
     }
-    .obs-note {
-      font-size: 12px;
-      line-height: 1.45;
+    .key-dashed {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1.5px dashed #334155;
+      background: #ffffff;
+      display: inline-block;
+    }
+
+    /* Compact floating active legend strip (sits inside .top-left-col directly below .top-pill) */
+    .active-legend-strip {
+      display: none;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      border-radius: 10px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+      padding: 7px 10px;
+      font-size: 11px;
       color: #1e293b;
-      outline: none;
+    }
+    .active-legend-strip.visible { display: block; }
+    .strip-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 4px;
+    }
+    .strip-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .strip-blue { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .strip-orange { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .strip-green { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+    .strip-red { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
+    /* Add Verification Marker mode row */
+    .verify-add-box {
+      display: none;
+      margin-top: 9px;
+      padding: 9px 10px;
+      background: #f8fafc;
+      border: 1px dashed #94a3b8;
+      border-radius: 9px;
+    }
+    .verify-add-box.open { display: block; }
+    .verify-add-box label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 5px;
+    }
+    .verify-select {
+      width: 100%;
+      padding: 5px 7px;
+      border: 1px solid #cbd5e1;
       border-radius: 6px;
+      font-size: 11.5px;
+      background: #ffffff;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+    .verify-hint {
+      font-size: 10.5px;
+      color: #0f172a;
+      line-height: 1.35;
+    }
+
+    /* Research Information Panel (slides open when any analytical feature is selected) */
+    .research-drawer {
+      display: none;
+      position: fixed;
+      right: 16px;
+      bottom: 84px;
+      z-index: 1001;
+      width: 326px;
+      max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 160px);
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(15, 23, 42, 0.16);
+      border-top: 4px solid #2563eb;
+      border-radius: 14px;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.2);
+      padding: 14px 15px;
+      color: #0f172a;
+      font-size: 12px;
+    }
+    .research-drawer.open { display: block; }
+    .research-drawer.cat-pedestrian { border-top-color: #2563eb; }
+    .research-drawer.cat-landmarks { border-top-color: #d97706; }
+    .research-drawer.cat-environmental { border-top-color: #059669; }
+    .research-drawer.cat-barriers { border-top-color: #dc2626; }
+
+    .rd-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .rd-cat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 3px 8px;
+      border-radius: 999px;
+      margin-bottom: 5px;
+    }
+    .rd-title {
+      margin: 0;
+      font-size: 14.5px;
+      font-weight: 700;
+      line-height: 1.25;
+      outline: none;
+      border-radius: 4px;
+    }
+    .rd-title:focus { background: #f8fafc; box-shadow: inset 0 0 0 1px #93c5fd; padding: 2px 4px; }
+
+    .rd-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .rd-field {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 9px;
+    }
+    .rd-label {
+      font-size: 9.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      margin-bottom: 3px;
+    }
+    .rd-val {
+      font-size: 11.5px;
+      color: #1e293b;
+      line-height: 1.42;
+    }
+    .rd-editable {
+      outline: none;
+      border-radius: 4px;
+      min-height: 20px;
+    }
+    .rd-editable:focus {
+      background: #ffffff;
       padding: 3px 5px;
       margin: -3px -5px;
+      box-shadow: inset 0 0 0 1px #93c5fd;
     }
-    .obs-note:focus {
-      background: #fffbeb;
-      box-shadow: inset 0 0 0 1px #f59e0b;
+    .rd-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
+    .rd-status-select {
+      flex: 1;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px 7px;
+      font-size: 11.5px;
+      font-weight: 600;
+      background: #ffffff;
+      color: #0f172a;
+      cursor: pointer;
+    }
+    .status-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .status-confirmed { background: #dcfce7; color: #166534; }
+    .status-verify { background: #fef3c7; color: #92400e; }
+    .status-assumption { background: #fee2e2; color: #991b1b; }
+
+    .rd-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 9px;
+      font-size: 10.5px;
+      color: #64748b;
+    }
+    .rd-delete-btn {
+      display: none;
+      border: none;
+      background: #fee2e2;
+      color: #b91c1c;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .rd-delete-btn.visible { display: inline-block; }
+
+    /* Analytical Map Markers — Distinct Accessible Shapes + Verification Halo */
+    .am-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      cursor: pointer;
+    }
+    .am-shape {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 11px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.34);
+      transition: transform 0.15s ease;
+    }
+    .am-wrap:hover .am-shape { transform: scale(1.16); }
+    .am-pedestrian {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #2563eb;
+      border: 2.5px solid #ffffff;
+    }
+    .am-landmarks {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: #d97706;
+      border: 2.5px solid #ffffff;
+      transform: rotate(45deg);
+    }
+    .am-landmarks span { transform: rotate(-45deg); display: block; font-size: 10px; }
+    .am-wrap:hover .am-landmarks { transform: rotate(45deg) scale(1.16); }
+    .am-environmental {
+      width: 21px;
+      height: 21px;
+      border-radius: 5px;
+      background: #059669;
+      border: 2.5px solid #ffffff;
+    }
+    .am-barriers {
+      width: 24px;
+      height: 22px;
+      background: #dc2626;
+      clip-path: polygon(50% 4%, 98% 94%, 2% 94%);
+      padding-top: 5px;
+      font-size: 10px;
+      filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.35));
+    }
+    .am-verify-ring {
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      border: 2px dashed #0f172a;
+      opacity: 0.72;
+      pointer-events: none;
+    }
+    .dir-chevron {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(37, 99, 235, 0.92);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 900;
+      border: 1.5px solid #ffffff;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.28);
+    }
+    .verify-banner {
+      display: none;
+      position: fixed;
+      top: 58px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1002;
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 999px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.28);
+    }
+    body.placing-verify-marker .verify-banner { display: block; }
   </style>
 </head>
-<body class="calm-map">
+<body class="minimal-map">
   <div id="map"></div>
 
-  <div class="title-card">
-    <h1>Exhibition GO &rarr; BMO Field</h1>
-    <div class="route-metrics">
-      <strong id="walk-summary">~190 m walk (~3 min)</strong><br>
-      <span id="straight-summary">Manitoba Dr exit to NE gate on Nunavut Rd</span>
-    </div>
-    <div class="legend">
-      <div class="legend-row"><span class="dot dot-start"></span>Exhibition GO &mdash; South Exit (Manitoba Dr)</div>
-      <div class="legend-row"><span class="dot dot-end"></span><span id="legend-end">BMO Field &mdash; NE Gate (Nunavut Rd)</span></div>
-      <div class="legend-row"><span class="dot dot-turn"></span>Decision point &mdash; Nunavut Rd turn</div>
-      <div class="legend-row"><span class="ring-swatch"></span><span id="legend-rings">190 m radius from GO exit</span></div>
-    </div>
-  </div>
+  <div class="verify-banner">Click anywhere on the map to place an editable "Requires Site Verification" marker (Esc to cancel)</div>
 
-  <div class="options-wrap">
-    <button id="options-btn" class="options-btn" type="button">Options</button>
-    <div id="options-drawer" class="options-drawer">
+  <div class="top-bar">
+    <div class="top-left-col">
+      <div class="top-pill">
+        <h1>Exhibition GO &rarr; BMO Field</h1>
+        <div class="measure-list">
+          <div class="measure-row">
+            <span class="measure-route-icon" aria-hidden="true"></span>
+            <span><span id="header-walk-text" class="measure-route-val">Walking path: 190 m</span> (est. ~3 min, varies by pace)</span>
+          </div>
+          <div class="measure-row">
+            <span class="measure-radius-icon" aria-hidden="true"></span>
+            <span><span id="header-radius-text" class="measure-radius-val">Study area: 190 m radius</span> (radial zone from exit)</span>
+          </div>
+        </div>
+        <div class="stop-legend" aria-label="Walkthrough stop marker legend">
+          <span class="stop-key"><span class="stop-key-dot sk-green">1</span> Start (Exit)</span>
+          <span class="stop-key"><span class="stop-key-dot sk-blue">2</span> Route / Gate (<strong style="color:#2563eb;">4</strong>)</span>
+          <span class="stop-key"><span class="stop-key-dot sk-orange">3</span> Decision Point</span>
+        </div>
+      </div>
+
+      <!-- Compact dynamic legend strip shown when analytical layers are active and panel is closed -->
+      <div id="active-legend-strip" class="active-legend-strip interactive-only">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#64748b;">Active Analysis Layers (click markers to inspect)</div>
+        <div id="strip-chips" class="strip-chips"></div>
+      </div>
+    </div>
+
+    <div class="top-right-wrap">
+    <div class="top-btn-row">
+      <button id="analysis-btn" class="top-btn interactive-only" type="button">Spatial Analysis<span id="layer-count-pill" class="layer-count-pill hidden">0</span></button>
+      <button id="autoplay-btn" class="top-btn interactive-only" type="button">&#9654; Auto-Play</button>
+      <button id="options-btn" class="top-btn interactive-only" type="button">Options</button>
+      <button id="reset-map-btn" class="top-btn interactive-only" type="button" title="Reset map view, layers, and radius">Reset Map</button>
+      <button id="clean-btn" class="top-btn" type="button">Clean View</button>
+    </div>
+
+    <!-- Environmental & Spatial Analysis Control Panel -->
+    <div id="analysis-panel" class="analysis-panel interactive-only" aria-label="Environmental and Spatial Analysis Layer Controls">
+      <div class="analysis-header">
+        <div>
+          <h2>Environmental &amp; Spatial Analysis</h2>
+          <p>Toggle exploratory wayfinding research layers independently or combine them. Click any feature to inspect.</p>
+        </div>
+        <button id="close-analysis-btn" class="panel-close-btn" type="button" aria-label="Close analysis panel">&times;</button>
+      </div>
+
+      <div class="layer-list">
+        <label class="layer-toggle" id="row-pedestrian">
+          <input type="checkbox" data-analysis-layer="pedestrian">
+          <span class="layer-swatch swatch-blue" aria-hidden="true">&rarr;</span>
+          <div class="layer-meta">
+            <div class="layer-name">Pedestrian Movement</div>
+            <div class="layer-framework">Kevin Lynch &mdash; Paths &middot; Routes &amp; arrows</div>
+            <div class="layer-pattern-line pat-blue"></div>
+          </div>
+        </label>
+
+        <label class="layer-toggle" id="row-landmarks">
+          <input type="checkbox" data-analysis-layer="landmarks">
+          <span class="layer-swatch swatch-orange" aria-hidden="true"><span>&#9670;</span></span>
+          <div class="layer-meta">
+            <div class="layer-name">Landmarks &amp; Decision Points</div>
+            <div class="layer-framework">Kevin Lynch &amp; Christopher Alexander</div>
+            <div class="layer-pattern-line pat-orange"></div>
+          </div>
+        </label>
+
+        <label class="layer-toggle" id="row-environmental">
+          <input type="checkbox" data-analysis-layer="environmental">
+          <span class="layer-swatch swatch-green" aria-hidden="true">&#9632;</span>
+          <div class="layer-meta">
+            <div class="layer-name">Environmental Features</div>
+            <div class="layer-framework">Jan Gehl &mdash; Life Between Buildings</div>
+            <div class="layer-pattern-line pat-green"></div>
+          </div>
+        </label>
+
+        <label class="layer-toggle" id="row-barriers">
+          <input type="checkbox" data-analysis-layer="barriers">
+          <span class="layer-swatch swatch-red" aria-hidden="true">!</span>
+          <div class="layer-meta">
+            <div class="layer-name">Accessibility &amp; Navigation Barriers</div>
+            <div class="layer-framework">Visibility, crossings &amp; site audit</div>
+            <div class="layer-pattern-line pat-red"></div>
+          </div>
+        </label>
+      </div>
+
+      <div class="analysis-actions">
+        <button id="btn-all-layers" class="analysis-btn" type="button">All On</button>
+        <button id="btn-clear-layers" class="analysis-btn" type="button">Base Map</button>
+        <button id="btn-add-verify" class="analysis-btn accent" type="button">+ Verification Pin</button>
+      </div>
+
+      <div id="verify-add-box" class="verify-add-box">
+        <label for="verify-cat-select">Category for new "Requires Site Verification" marker:</label>
+        <select id="verify-cat-select" class="verify-select">
+          <option value="pedestrian">Pedestrian Movement (Blue)</option>
+          <option value="landmarks">Landmarks &amp; Decision Points (Orange)</option>
+          <option value="environmental" selected>Environmental Features (Green)</option>
+          <option value="barriers">Accessibility &amp; Navigation Barriers (Red)</option>
+        </select>
+        <div class="verify-hint">Now click anywhere on the map to place your editable observation marker.</div>
+      </div>
+
+      <div class="dynamic-legend">
+        <div class="legend-heading">Active Layer Legend</div>
+        <div id="dynamic-legend-body" class="legend-empty">Base map view &mdash; toggle a layer above to display analytical overlays.</div>
+        <div class="legend-status-key">
+          <span class="status-dot-key"><span class="key-solid"></span> Confirmed (OSM / Site)</span>
+          <span class="status-dot-key"><span class="key-dashed"></span> Requires Site Verification</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="options-drawer" class="options-drawer interactive-only">
       <div class="opt-section">
-        <div class="opt-label">190 m Radius Ring</div>
+        <div class="opt-label">
+          <span>Study Radius</span>
+          <strong id="radius-readout">190 m</strong>
+        </div>
         <div class="chip-group">
-          <button class="chip active" type="button" data-rings="start">GO Exit (190 m)</button>
+          <button class="chip active" type="button" data-rings="start">GO Exit</button>
           <button class="chip" type="button" data-rings="both">Both</button>
           <button class="chip" type="button" data-rings="off">Off</button>
         </div>
-      </div>
-
-      <div class="opt-section">
-        <div class="opt-label">Destination Gate</div>
-        <div class="chip-group">
-          <button class="chip active" type="button" data-gate="neGate">NE Gate (Nunavut Rd)</button>
-          <button class="chip" type="button" data-gate="gate1">Gate 1 (North)</button>
-          <button class="chip" type="button" data-gate="gate3">Gate 3 (SE)</button>
+        <div class="radius-row">
+          <input id="radius-slider" class="radius-slider" type="range" min="50" max="400" step="5" value="190">
+          <button id="radius-snap-btn" class="snap-btn" type="button">190 m</button>
         </div>
       </div>
 
       <div class="opt-section">
-        <div class="opt-label">Map Style</div>
+        <div class="opt-label">Map Detail</div>
         <div class="chip-group">
-          <button class="chip active" type="button" data-style="clean">Clean OSM</button>
-          <button class="chip" type="button" data-style="standard">Standard OSM</button>
+          <button class="chip active" type="button" data-style="minimal">Minimal Gray</button>
+          <button class="chip" type="button" data-style="color">Color OSM</button>
         </div>
       </div>
 
       <div class="opt-section">
-        <div class="opt-label">Overlays</div>
-        <label class="check-row"><input id="chk-obs" type="checkbox" checked> Site observation card</label>
-        <label class="check-row"><input id="chk-straight" type="checkbox"> Straight-line span</label>
-      </div>
-
-      <div class="drawer-actions">
-        <button id="fit-btn" class="small-btn" type="button">Recenter</button>
-        <button id="reset-btn" class="small-btn" type="button">Reset Pins</button>
+        <label class="check-row"><input id="chk-sightline" type="checkbox" checked> Sightline cone</label>
       </div>
     </div>
+  </div>
+  </div>
+
+  <!-- Minimal Walkthrough Card -->
+  <div id="story-card" class="story-card interactive-only">
+    <div class="stepper">
+      <button class="step-pill active" type="button" data-step="0" title="Overview"></button>
+      <button class="step-pill" type="button" data-step="1" title="Stop 1: Exhibition GO Exit"></button>
+      <button class="step-pill" type="button" data-step="2" title="Stop 2: Nova Scotia Ave"></button>
+      <button class="step-pill decision" type="button" data-step="3" title="Stop 3: Turn at Nunavut Rd"></button>
+      <button class="step-pill" type="button" data-step="4" title="Stop 4: BMO Field NE Gate"></button>
+    </div>
+
+    <div class="story-top">
+      <h2 id="story-title" class="story-title">Environmental Wayfinding Walkthrough</h2>
+      <span id="story-badge" class="story-badge">est. ~3 min</span>
+    </div>
+
+    <div id="story-photo-container"></div>
+
+    <p id="story-line" class="story-line" contenteditable="true" spellcheck="true" title="Click to edit note"></p>
+
+    <div class="story-nav">
+      <button id="prev-btn" class="nav-btn" type="button">&larr; Back</button>
+      <button id="next-btn" class="nav-btn primary" type="button">Start Walk &rarr;</button>
+    </div>
+  </div>
+
+  <!-- Research Information Panel (opens when an analytical feature is clicked) -->
+  <aside id="research-drawer" class="research-drawer interactive-only" aria-label="Research Information Panel">
+    <div class="rd-top">
+      <div>
+        <div id="rd-cat-pill" class="rd-cat-pill strip-blue">&rarr; Pedestrian Movement</div>
+        <h3 id="rd-title" class="rd-title" contenteditable="true" spellcheck="true" title="Click to edit feature name">Feature Name</h3>
+      </div>
+      <button id="close-research-btn" class="panel-close-btn" type="button" aria-label="Close research panel">&times;</button>
+    </div>
+
+    <div class="rd-grid">
+      <div class="rd-field">
+        <div class="rd-label">Location</div>
+        <div id="rd-location" class="rd-val"></div>
+      </div>
+      <div class="rd-field">
+        <div class="rd-label">Analytical Category</div>
+        <div id="rd-category" class="rd-val"></div>
+      </div>
+      <div class="rd-field">
+        <div class="rd-label">Research Framework</div>
+        <div id="rd-framework" class="rd-val"></div>
+      </div>
+      <div class="rd-field">
+        <div class="rd-label">Observation or Research Question (click to edit)</div>
+        <div id="rd-observation" class="rd-val rd-editable" contenteditable="true" spellcheck="true"></div>
+      </div>
+      <div class="rd-field">
+        <div class="rd-label">Potential Design Opportunity (click to edit)</div>
+        <div id="rd-opportunity" class="rd-val rd-editable" contenteditable="true" spellcheck="true"></div>
+      </div>
+      <div class="rd-field">
+        <div class="rd-label">Verification Status</div>
+        <div class="rd-status-row">
+          <select id="rd-status-select" class="rd-status-select">
+            <option value="Requires Site Verification">Requires Site Verification</option>
+            <option value="Confirmed (OSM)">Confirmed (OSM)</option>
+            <option value="Confirmed (Site Walk)">Confirmed (Site Walk)</option>
+            <option value="Research Assumption">Research Assumption</option>
+          </select>
+          <span id="rd-status-badge" class="status-badge status-verify">Unverified</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rd-footer">
+      <span>Edits auto-save locally</span>
+      <button id="rd-delete-btn" class="rd-delete-btn" type="button">Delete Marker</button>
+    </div>
+  </aside>
+
+  <div id="lightbox" class="lightbox" title="Click to close">
+    <img id="lightbox-img" src="" alt="Site walk photo">
   </div>
 
   <input id="photo-file-input" type="file" accept="image/*" style="display:none">
 
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const START_DEFAULT = [43.63530, -79.41876];     // Exhibition GO — South Exit (Manitoba Dr & Nova Scotia Ave)
-    const DECISION_DEFAULT = [43.63428, -79.41822];  // Nova Scotia Ave / Nunavut Rd turn
-    const GATE_PRESETS = {
-      neGate: { name: 'BMO Field — NE Gate (Nunavut Rd)', coords: [43.63408, -79.41760] },
-      gate1: { name: 'BMO Field — Gate 1 (North)', coords: [43.634016, -79.418677] },
-      gate3: { name: 'BMO Field — Gate 3 (SE)', coords: [43.632760, -79.417474] }
-    };
+    const START_COORDS = [43.63530, -79.41876];     // Exhibition GO — South Exit (Manitoba Dr)
+    const MID_COORDS = [43.63472, -79.41848];       // Nova Scotia Ave
+    const DECISION_COORDS = [43.63428, -79.41822];  // Turn at Nunavut Rd
+    const END_COORDS = [43.63408, -79.41760];       // BMO Field — NE Gate (Nunavut Rd)
 
-    const RING_RADIUS_METERS = 190;
-    const WALK_SPEED_MPS = 1.08; // ~3 min for 190 m (matches Google Maps pedestrian pace)
-    const STORAGE_KEY_NOTE = 'explace_wayfinding_obs_note_v1';
-    const STORAGE_KEY_PHOTO = 'explace_wayfinding_obs_photo_v1';
-    const DEFAULT_OBS_NOTE = 'At the Nunavut Rd turn, the path curves toward BMO Field, but individual gate signage is not yet visible from the sidewalk.';
+    const WALK_SPEED_MPS = 1.08;
+    const STORAGE_PREFIX = 'explace_simple_walk_v2_';
 
-    const map = L.map('map', { zoomControl: false }).setView([43.6347, -79.4185], 17);
-    L.control.zoom({ position: 'bottomleft' }).addTo(map);
-    L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+    // Concise, site-research-grounded environmental observations at each stop
+    const STEPS = [
+      {
+        id: 'overview',
+        title: 'Environmental Wayfinding Walkthrough',
+        badge: 'est. ~3 min',
+        line: 'Compares the 190 m sidewalk route (blue dotted path; est. ~3 min depending on pace) within the 190 m circular study radius (slate dashed zone) from Exhibition GO Exit to BMO Field NE Gate.',
+        showPhoto: false,
+        walkRatio: 0,
+        bearing: null,
+        zoom: 17
+      },
+      {
+        id: 'stop1',
+        title: '1 · Exhibition GO Exit',
+        badge: '0 m',
+        line: 'Threshold emerging from under the Gardiner Expressway onto Manitoba Dr (OSM verified); overhead shadow, street crossing, and the open sightline south down Nova Scotia Ave shape initial orientation (verify lighting on-site).',
+        showPhoto: true,
+        photoFile: 'photos/stop1.jpg',
+        walkRatio: 0.02,
+        bearing: 162,
+        coords: START_COORDS,
+        zoom: 18
+      },
+      {
+        id: 'stop2',
+        title: '2 · Nova Scotia Ave',
+        badge: '80 m',
+        line: 'Continuous east facade of the Toronto Star Food Building frames the west sidewalk opposite Horse Palace, channelling movement south while partially screening BMO Field until the corner opens (verify edge texture & shade on-site).',
+        showPhoto: true,
+        photoFile: 'photos/stop2.jpg',
+        walkRatio: 0.44,
+        bearing: 162,
+        coords: MID_COORDS,
+        zoom: 18
+      },
+      {
+        id: 'stop3',
+        title: '3 · Turn at Nunavut Rd',
+        badge: '135 m',
+        line: 'Key spatial decision point where Nova Scotia Ave meets Nunavut Rd and BMO Field’s north pedestrian plaza; stadium massing opens into view, yet individual gate signage is not yet visible from the sidewalk.',
+        showPhoto: true,
+        photoFile: 'photos/stop3.jpg',
+        isDecision: true,
+        walkRatio: 0.72,
+        bearing: 118,
+        coords: DECISION_COORDS,
+        zoom: 18
+      },
+      {
+        id: 'stop4',
+        title: '4 · BMO Field NE Gate',
+        badge: '190 m',
+        line: 'Sidewalk curves east along Nunavut Rd past the north plaza edge to the NE stadium entrance beside Lot 853 (190 m sidewalk walk; est. ~3 min depending on pace — verify curb transition & gate cues on-site).',
+        showPhoto: true,
+        photoFile: 'photos/stop4.jpg',
+        walkRatio: 1.0,
+        bearing: 195,
+        coords: END_COORDS,
+        zoom: 18
+      }
+    ];
 
-    // Genuine OpenStreetMap tiles (no API key required); CSS class .calm-map softens colors by default
+    let currentStep = 0;
+    let currentRadiusMeters = 190;
+    let ringsMode = 'start';
+    let showSightline = true;
+    let autoPlayTimer = null;
+
+    function getSavedLine(step) {
+      return localStorage.getItem(STORAGE_PREFIX + 'line_' + step.id) || step.line;
+    }
+    function saveLine(stepId, text) {
+      try { localStorage.setItem(STORAGE_PREFIX + 'line_' + stepId, text); } catch (_) {}
+    }
+    function getSavedPhoto(stepId) {
+      return localStorage.getItem(STORAGE_PREFIX + 'photo_' + stepId)
+        || localStorage.getItem('explace_simple_walk_v1_photo_' + stepId)
+        || (stepId === 'stop3'
+          ? (localStorage.getItem('explace_walkthrough_v1_photo_stop3') || localStorage.getItem('explace_wayfinding_obs_photo_v1') || '')
+          : '');
+    }
+    function savePhoto(stepId, dataUrl) {
+      try {
+        if (dataUrl) localStorage.setItem(STORAGE_PREFIX + 'photo_' + stepId, dataUrl);
+        else localStorage.removeItem(STORAGE_PREFIX + 'photo_' + stepId);
+      } catch (_) {}
+    }
+
+    const map = L.map('map', { zoomControl: false }).setView([43.6347, -79.4183], 17);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Layers
-    const routeGroup = L.featureGroup().addTo(map);
-    const observationGroup = L.featureGroup().addTo(map);
-    const straightGroup = L.featureGroup();
     const ringsGroup = L.featureGroup().addTo(map);
+    const sightlineGroup = L.featureGroup().addTo(map);
+    const routeGroup = L.featureGroup().addTo(map);
+    const stopsGroup = L.featureGroup().addTo(map);
 
-    const routeCasing = L.polyline([], { color: '#ffffff', weight: 11, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(routeGroup);
-    const routeLine = L.polyline([], { color: '#2563eb', weight: 6.5, opacity: 0.96, dashArray: '1 12', lineCap: 'round' }).addTo(routeGroup);
-    const routeMidBadge = L.marker([43.6348, -79.4184], { interactive: false, zIndexOffset: 300 }).addTo(routeGroup);
-
-    const straightLine = L.polyline([START_DEFAULT, GATE_PRESETS.neGate.coords], {
-      color: '#1e293b',
-      weight: 2,
-      dashArray: '5 6',
-      opacity: 0.85
-    }).addTo(straightGroup);
-    const straightBadge = L.marker([43.6347, -79.4182], { interactive: false }).addTo(straightGroup);
-
+    // Distinct slate dashed boundary for the circular Study Radius (differentiated from the blue walking path)
     const ringStyle = {
-      radius: RING_RADIUS_METERS,
-      color: '#275bb8',
+      radius: currentRadiusMeters,
+      color: '#475569',
       weight: 2,
       fill: true,
-      fillColor: '#275bb8',
-      fillOpacity: 0.05,
-      dashArray: '6 5'
+      fillColor: '#475569',
+      fillOpacity: 0.04,
+      dashArray: '6 6'
     };
-    const startRing = L.circle(START_DEFAULT, ringStyle)
-      .bindTooltip('Exhibition GO — South Exit · 190 m radius')
-      .addTo(ringsGroup);
-    const endRing = L.circle(GATE_PRESETS.neGate.coords, ringStyle)
-      .bindTooltip('BMO Field — NE Gate · 190 m radius');
+    const startRing = L.circle(START_COORDS, ringStyle).addTo(ringsGroup);
+    const endRing = L.circle(END_COORDS, ringStyle);
 
-    function getRingEastEdge(centerLatLng) {
-      // 190 m east at lat ~43.635° (1° lng ≈ 80,570 m)
-      const dLng = RING_RADIUS_METERS / (111320 * Math.cos(centerLatLng[0] * Math.PI / 180));
-      return [centerLatLng[0], centerLatLng[1] + dLng];
+    function getRingEastEdge(center, radiusM) {
+      // Anchor on the top (north) arc of the circle so the label never clips at narrow viewport edges
+      const dLat = radiusM / 111320;
+      return [center[0] + dLat, center[1]];
     }
-
-    const ringEdgeLabel = L.marker(getRingEastEdge(START_DEFAULT), {
-      interactive: false,
-      icon: L.divIcon({
+    function makeRingLabelIcon(radiusM) {
+      return L.divIcon({
         className: '',
-        html: '<div class="ring-edge-label">190 m radius</div>',
+        html: `<div class="ring-edge-label">${radiusM} m Study Radius (radial zone)</div>`,
         iconSize: [0, 0],
         iconAnchor: [0, 0]
-      })
+      });
+    }
+    const ringEdgeLabel = L.marker(getRingEastEdge(START_COORDS, currentRadiusMeters), {
+      interactive: false,
+      icon: makeRingLabelIcon(currentRadiusMeters)
     }).addTo(ringsGroup);
 
-    let ringsMode = 'start';
+    const routeCasing = L.polyline([], { color: '#ffffff', weight: 11, opacity: 0.96, lineCap: 'round', lineJoin: 'round' }).addTo(routeGroup);
+    const routeDotted = L.polyline([], { color: '#2563eb', weight: 6.5, opacity: 0.92, dashArray: '1 12', lineCap: 'round' }).addTo(routeGroup);
+    const routeWalked = L.polyline([], { color: '#059669', weight: 6.5, opacity: 0.98, lineCap: 'round', lineJoin: 'round' }).addTo(routeGroup);
+    const routeMidBadge = L.marker([43.6348, -79.4184], { interactive: false, zIndexOffset: 250 }).addTo(routeGroup);
 
-    // Pins
-    const startIcon = L.divIcon({ className: '', html: '<div class="pin-dot pin-start"></div>', iconSize: [24, 24], iconAnchor: [12, 12] });
-    const endIcon = L.divIcon({ className: '', html: '<div class="pin-dot pin-end"></div>', iconSize: [24, 24], iconAnchor: [12, 12] });
-    const decisionIcon = L.divIcon({ className: '', html: '<div class="pin-decision">!</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
+    const walkerMarker = L.marker(START_COORDS, {
+      interactive: false,
+      zIndexOffset: 650,
+      icon: L.divIcon({ className: '', html: '<div class="walker-dot"></div>', iconSize: [21, 21], iconAnchor: [10, 10] })
+    });
 
-    const startMarker = L.marker(START_DEFAULT, { icon: startIcon, draggable: true, zIndexOffset: 400 })
-      .bindTooltip('Exhibition GO — South Exit (Manitoba Dr)', { permanent: true, direction: 'top', offset: [0, -12], className: 'endpoint-tooltip' })
-      .addTo(map);
-
-    const endMarker = L.marker(GATE_PRESETS.neGate.coords, { icon: endIcon, draggable: true, zIndexOffset: 400 })
-      .bindTooltip(GATE_PRESETS.neGate.name, { permanent: true, direction: 'bottom', offset: [34, 12], className: 'endpoint-tooltip' })
-      .addTo(map);
-
-    const decisionMarker = L.marker(DECISION_DEFAULT, { icon: decisionIcon, draggable: true, zIndexOffset: 500 })
-      .addTo(observationGroup);
-
-    // Observation callout card (anchored to the left of the Nunavut Rd turn so it never blocks the eastern leg)
-    let obsCardMarker = null;
-    let savedNote = localStorage.getItem(STORAGE_KEY_NOTE) || DEFAULT_OBS_NOTE;
-    let savedPhoto = localStorage.getItem(STORAGE_KEY_PHOTO) || '';
-
-    function buildCardHtml() {
-      const photoHtml = savedPhoto
-        ? `<div class="obs-photo-box">
-             <img src="${savedPhoto}" alt="Nunavut Road turn observation" class="obs-photo-img" id="obs-photo-trigger">
-             <div class="obs-photo-actions">
-               <button type="button" class="obs-mini-btn" id="obs-change-photo">Replace</button>
-               <button type="button" class="obs-mini-btn" id="obs-remove-photo">Remove</button>
-             </div>
-           </div>`
-        : `<div class="obs-photo-empty" id="obs-photo-trigger">+ Click to add site photo</div>`;
-
-      return `
-        <div class="obs-callout-wrap">
-          <div class="obs-card">
-            <div class="obs-tag">Site Walk Observation</div>
-            <div class="obs-title">Turn at Nunavut Road</div>
-            ${photoHtml}
-            <div class="obs-note" id="obs-note-editable" contenteditable="true" spellcheck="true"></div>
-          </div>
-          <div class="obs-leader"></div>
-        </div>
-      `;
+    function destPoint(lat, lng, bearingDeg, distM) {
+      const R = 6378137;
+      const brng = bearingDeg * Math.PI / 180;
+      const lat1 = lat * Math.PI / 180;
+      const lng1 = lng * Math.PI / 180;
+      const dLat = (distM * Math.cos(brng)) / R;
+      const dLng = (distM * Math.sin(brng)) / (R * Math.cos(lat1));
+      return [(lat1 + dLat) * 180 / Math.PI, (lng1 + dLng) * 180 / Math.PI];
     }
 
-    function renderObservationCard() {
-      const pos = decisionMarker.getLatLng();
-      if (obsCardMarker) observationGroup.removeLayer(obsCardMarker);
+    function renderSightline(coords, bearingDeg, isDecision) {
+      sightlineGroup.clearLayers();
+      if (!showSightline || !coords || bearingDeg === null) return;
+      const pts = [coords];
+      for (let a = bearingDeg - 26; a <= bearingDeg + 26; a += 6.5) {
+        pts.push(destPoint(coords[0], coords[1], a, 40));
+      }
+      pts.push(coords);
+      const color = isDecision ? '#d97706' : '#059669';
+      L.polygon(pts, {
+        color, weight: 1.5, opacity: 0.45, fillColor: color, fillOpacity: 0.16, interactive: false
+      }).addTo(sightlineGroup);
+    }
 
-      const cardIcon = L.divIcon({
+    // Minimal pin labels: only Start & End permanently labeled to keep map ultra-clean
+    const stopMarkers = {};
+    function createStopPin(stepIndex, labelText, pinClass, coords, tooltipText, tooltipDir, tooltipOffset) {
+      const icon = L.divIcon({
         className: '',
-        html: buildCardHtml(),
-        iconSize: [0, 0],
-        iconAnchor: [13, 0]
+        html: `<div class="stop-pin ${pinClass}" id="map-pin-${stepIndex}">${labelText}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
       });
+      const marker = L.marker(coords, { icon, zIndexOffset: 500 + stepIndex * 10 }).addTo(stopsGroup);
+      if (tooltipText) {
+        marker.bindTooltip(tooltipText, {
+          permanent: true,
+          direction: tooltipDir || 'top',
+          offset: tooltipOffset || [0, -14],
+          className: 'endpoint-tooltip'
+        });
+      }
+      marker.on('click', () => { stopAutoPlay(); goToStep(stepIndex); });
+      stopMarkers[stepIndex] = marker;
+    }
 
-      obsCardMarker = L.marker(pos, { icon: cardIcon, interactive: true, zIndexOffset: 450 }).addTo(observationGroup);
+    createStopPin(1, '1', 'start', START_COORDS, 'Exhibition GO Exit', 'top', [0, -14]);
+    createStopPin(2, '2', 'mid', MID_COORDS, null);
+    createStopPin(3, '3', 'decision', DECISION_COORDS, null);
+    createStopPin(4, '4', 'end', END_COORDS, 'BMO Field NE Gate', 'bottom', [10, 14]);
 
-      setTimeout(() => {
-        const el = obsCardMarker.getElement();
-        if (!el) return;
-        L.DomEvent.disableClickPropagation(el);
-        L.DomEvent.disableScrollPropagation(el);
+    let routeCoords = [START_COORDS, END_COORDS];
+    let cumDist = [0, 190];
+    let totalDistance = 190;
+    let currentWalked = 0;
+    let animRaf = null;
 
-        const noteEl = el.querySelector('#obs-note-editable');
-        if (noteEl) {
-          noteEl.textContent = savedNote;
-          noteEl.addEventListener('input', () => {
-            savedNote = noteEl.textContent.trim();
-            localStorage.setItem(STORAGE_KEY_NOTE, savedNote);
-          });
+    function computeCumDist(coords) {
+      const dists = [0];
+      for (let i = 1; i < coords.length; i++) dists.push(dists[i - 1] + map.distance(coords[i - 1], coords[i]));
+      return dists;
+    }
+
+    function sliceAt(coords, dists, target) {
+      if (coords.length < 2 || target <= 0) return { point: coords[0], prefix: [coords[0]] };
+      const maxD = dists[dists.length - 1];
+      if (target >= maxD) return { point: coords[coords.length - 1], prefix: coords.slice() };
+      const prefix = [coords[0]];
+      for (let i = 1; i < coords.length; i++) {
+        if (dists[i] >= target) {
+          const seg = dists[i] - dists[i - 1];
+          const t = seg > 0 ? (target - dists[i - 1]) / seg : 0;
+          const pt = [
+            coords[i - 1][0] + (coords[i][0] - coords[i - 1][0]) * t,
+            coords[i - 1][1] + (coords[i][1] - coords[i - 1][1]) * t
+          ];
+          prefix.push(pt);
+          return { point: pt, prefix };
         }
+        prefix.push(coords[i]);
+      }
+      return { point: coords[coords.length - 1], prefix: coords.slice() };
+    }
 
-        const trigger = el.querySelector('#obs-photo-trigger');
-        if (trigger) trigger.addEventListener('click', () => document.getElementById('photo-file-input').click());
+    function animateWalkTo(targetMeters) {
+      if (animRaf) cancelAnimationFrame(animRaf);
+      const startVal = currentWalked;
+      const endVal = Math.max(0, Math.min(totalDistance, targetMeters));
+      const t0 = performance.now();
 
-        const changeBtn = el.querySelector('#obs-change-photo');
-        if (changeBtn) changeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          document.getElementById('photo-file-input').click();
-        });
+      if (endVal <= 1 && startVal <= 1) {
+        routeWalked.setLatLngs([]);
+        if (routeGroup.hasLayer(walkerMarker)) routeGroup.removeLayer(walkerMarker);
+        currentWalked = 0;
+        return;
+      }
+      if (!routeGroup.hasLayer(walkerMarker)) walkerMarker.addTo(routeGroup);
 
-        const removeBtn = el.querySelector('#obs-remove-photo');
-        if (removeBtn) removeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          savedPhoto = '';
-          localStorage.removeItem(STORAGE_KEY_PHOTO);
-          renderObservationCard();
-        });
-      }, 0);
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / 600);
+        const eased = 1 - Math.pow(1 - p, 3);
+        const val = startVal + (endVal - startVal) * eased;
+        currentWalked = val;
+
+        if (val <= 1) {
+          routeWalked.setLatLngs([]);
+          if (routeGroup.hasLayer(walkerMarker)) routeGroup.removeLayer(walkerMarker);
+        } else {
+          const { point, prefix } = sliceAt(routeCoords, cumDist, val);
+          routeWalked.setLatLngs(prefix);
+          walkerMarker.setLatLng(point);
+        }
+        if (p < 1) animRaf = requestAnimationFrame(tick);
+      }
+      animRaf = requestAnimationFrame(tick);
+    }
+
+    // Card UI
+    const storyCard = document.getElementById('story-card');
+    const titleEl = document.getElementById('story-title');
+    const badgeEl = document.getElementById('story-badge');
+    const lineEl = document.getElementById('story-line');
+    const photoContainerEl = document.getElementById('story-photo-container');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const lightboxEl = document.getElementById('lightbox');
+    const lightboxImgEl = document.getElementById('lightbox-img');
+
+    lightboxEl.addEventListener('click', () => lightboxEl.classList.remove('open'));
+    lineEl.addEventListener('input', () => saveLine(STEPS[currentStep].id, lineEl.textContent.trim()));
+
+    function showPhotoMarkup(step, src, isLocalFile) {
+      photoContainerEl.innerHTML = `
+        <div class="story-photo-wrap">
+          <img src="${src}" alt="${step.title}" class="story-photo-img" id="active-photo" title="Click to enlarge">
+          <div class="story-photo-actions">
+            <button type="button" class="mini-btn" id="replace-photo">Replace</button>
+            ${isLocalFile ? '' : '<button type="button" class="mini-btn" id="remove-photo">Remove</button>'}
+          </div>
+        </div>`;
+      document.getElementById('active-photo').addEventListener('click', () => {
+        lightboxImgEl.src = src;
+        lightboxEl.classList.add('open');
+      });
+      document.getElementById('replace-photo').addEventListener('click', () => document.getElementById('photo-file-input').click());
+      const rm = document.getElementById('remove-photo');
+      if (rm) rm.addEventListener('click', () => { savePhoto(step.id, ''); renderPhoto(step); });
+    }
+
+    function showPhotoPlaceholder(step) {
+      photoContainerEl.innerHTML = `<div class="story-photo-empty" id="add-photo">+ Add site photo (click or drop image)</div>`;
+      const box = document.getElementById('add-photo');
+      box.addEventListener('click', () => document.getElementById('photo-file-input').click());
+      box.addEventListener('dragover', (e) => { e.preventDefault(); box.classList.add('dragover'); });
+      box.addEventListener('dragleave', () => box.classList.remove('dragover'));
+      box.addEventListener('drop', (e) => {
+        e.preventDefault();
+        box.classList.remove('dragover');
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = () => { savePhoto(step.id, reader.result); renderPhoto(step); };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderPhoto(step) {
+      photoContainerEl.innerHTML = '';
+      if (!step.showPhoto) return;
+      const saved = getSavedPhoto(step.id);
+      if (saved) {
+        showPhotoMarkup(step, saved, false);
+        return;
+      }
+      if (step.photoFile) {
+        const probe = new Image();
+        probe.onload = () => {
+          if (STEPS[currentStep].id === step.id) showPhotoMarkup(step, step.photoFile, true);
+        };
+        probe.onerror = () => {
+          if (STEPS[currentStep].id === step.id) showPhotoPlaceholder(step);
+        };
+        probe.src = step.photoFile;
+      } else {
+        showPhotoPlaceholder(step);
+      }
     }
 
     document.getElementById('photo-file-input').addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
+      const step = STEPS[currentStep];
       const reader = new FileReader();
-      reader.onload = () => {
-        savedPhoto = reader.result;
-        try { localStorage.setItem(STORAGE_KEY_PHOTO, savedPhoto); } catch (_) {}
-        renderObservationCard();
-      };
+      reader.onload = () => { savePhoto(step.id, reader.result); renderPhoto(step); };
       reader.readAsDataURL(file);
       e.target.value = '';
     });
 
-    // Route & geometry helpers
-    let routeCoords = [START_DEFAULT, GATE_PRESETS.neGate.coords];
-
-    function getMidpointOnPolyline(coords) {
-      const dists = [0];
-      for (let i = 1; i < coords.length; i++) {
-        dists.push(dists[i - 1] + map.distance(coords[i - 1], coords[i]));
-      }
-      const total = dists[dists.length - 1];
-      const half = total * 0.42;
-      for (let i = 1; i < coords.length; i++) {
-        if (dists[i] >= half) {
-          const seg = dists[i] - dists[i - 1];
-          const t = seg > 0 ? (half - dists[i - 1]) / seg : 0;
-          return {
-            total,
-            point: [
-              coords[i - 1][0] + (coords[i][0] - coords[i - 1][0]) * t,
-              coords[i - 1][1] + (coords[i][1] - coords[i - 1][1]) * t
-            ]
-          };
-        }
-      }
-      return { total, point: coords[0] };
-    }
-
-    function updateStraightAndRings() {
-      const a = startMarker.getLatLng();
-      const b = endMarker.getLatLng();
-      const direct = Math.round(map.distance(a, b));
-      document.getElementById('straight-summary').textContent = `${direct} m straight-line (Manitoba Dr exit to gate)`;
-
-      startRing.setLatLng(a);
-      endRing.setLatLng(b);
-      ringEdgeLabel.setLatLng(getRingEastEdge([a.lat, a.lng]));
-      straightLine.setLatLngs([a, b]);
-      straightBadge.setLatLng([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2]);
-      straightBadge.setIcon(L.divIcon({
-        className: '',
-        html: `<div class="straight-label">${direct} m straight-line</div>`,
-        iconSize: [0, 0],
-        iconAnchor: [0, 0]
-      }));
-    }
-
-    function fitCleanView() {
+    function fitOverviewBounds() {
       if (ringsMode === 'both') {
-        map.fitBounds(ringsGroup.getBounds(), { padding: [26, 26], maxZoom: 17 });
-        return;
+        map.fitBounds(ringsGroup.getBounds(), { paddingTopLeft: [240, 35], paddingBottomRight: [35, 35], maxZoom: 17 });
+      } else if (ringsMode === 'start') {
+        const b = startRing.getBounds().extend(END_COORDS);
+        map.fitBounds(b, { paddingTopLeft: [220, 35], paddingBottomRight: [35, 35], maxZoom: 17 });
+      } else {
+        const b = L.latLngBounds(routeCoords);
+        map.fitBounds(b, { paddingTopLeft: [300, 80], paddingBottomRight: [60, 80], maxZoom: 18 });
       }
-      if (ringsMode === 'start') {
-        const bounds = startRing.getBounds().extend(endMarker.getLatLng());
-        map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
-        return;
-      }
-      const bounds = L.latLngBounds(routeCoords);
-      bounds.extend(startMarker.getLatLng());
-      bounds.extend(endMarker.getLatLng());
-      bounds.extend(decisionMarker.getLatLng());
-      bounds.extend([decisionMarker.getLatLng().lat, decisionMarker.getLatLng().lng - 0.0020]);
-      map.fitBounds(bounds, { paddingTopLeft: [45, 95], paddingBottomRight: [60, 75], maxZoom: 18 });
     }
 
-    async function fetchWalkingRoute(shouldFit) {
-      const a = startMarker.getLatLng();
-      const b = endMarker.getLatLng();
-      updateStraightAndRings();
+    function goToStep(index) {
+      currentStep = Math.max(0, Math.min(STEPS.length - 1, index));
+      const step = STEPS[currentStep];
 
-      const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 6000);
+      storyCard.classList.toggle('decision-step', Boolean(step.isDecision));
+      titleEl.textContent = step.title;
+      badgeEl.textContent = step.badge;
+      lineEl.textContent = getSavedLine(step);
+      renderPhoto(step);
 
-      try {
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timer);
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        const geom = data.routes && data.routes[0] && data.routes[0].geometry;
-        if (!geom || geom.coordinates.length < 2) throw new Error();
-        const latLngs = geom.coordinates.map(([lng, lat]) => [lat, lng]);
-        if (map.distance([a.lat, a.lng], latLngs[0]) <= 20 && map.distance([a.lat, a.lng], latLngs[0]) > 2) latLngs.unshift([a.lat, a.lng]);
-        if (map.distance([b.lat, b.lng], latLngs[latLngs.length - 1]) <= 20 && map.distance([b.lat, b.lng], latLngs[latLngs.length - 1]) > 2) latLngs.push([b.lat, b.lng]);
-        routeCoords = latLngs;
-      } catch (_) {
-        clearTimeout(timer);
-        routeCoords = [[a.lat, a.lng], [b.lat, b.lng]];
-      }
-
-      routeCasing.setLatLngs(routeCoords);
-      routeLine.setLatLngs(routeCoords);
-
-      const { total, point } = getMidpointOnPolyline(routeCoords);
-      const rounded = Math.round(total);
-      const mins = Math.max(1, Math.round((total / WALK_SPEED_MPS) / 60));
-      document.getElementById('walk-summary').textContent = `${rounded} m walk (~${mins} min)`;
-
-      routeMidBadge.setLatLng(point);
-      routeMidBadge.setIcon(L.divIcon({
-        className: '',
-        html: `<div class="route-pill">${rounded} m &middot; ~${mins} min</div>`,
-        iconSize: [0, 0],
-        iconAnchor: [-16, 0]
-      }));
-
-      if (shouldFit) fitCleanView();
-    }
-
-    // Options drawer interactions
-    const optionsBtn = document.getElementById('options-btn');
-    const optionsDrawer = document.getElementById('options-drawer');
-    optionsBtn.addEventListener('click', () => optionsDrawer.classList.toggle('open'));
-
-    document.querySelectorAll('.chip[data-gate]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const preset = GATE_PRESETS[btn.dataset.gate];
-        if (!preset) return;
-        document.querySelectorAll('.chip[data-gate]').forEach((b) => b.classList.toggle('active', b === btn));
-        endMarker.setLatLng(preset.coords);
-        endMarker.setTooltipContent(preset.name);
-        document.getElementById('legend-end').textContent = preset.name;
-        fetchWalkingRoute(true);
+      document.querySelectorAll('.step-pill').forEach((pill, i) => {
+        pill.classList.toggle('active', i === currentStep);
+        pill.classList.toggle('done', i < currentStep);
       });
+
+      [1, 2, 3, 4].forEach((n) => {
+        const el = document.getElementById(`map-pin-${n}`);
+        if (el) el.classList.toggle('active', n === currentStep);
+      });
+
+      prevBtn.disabled = currentStep === 0;
+      if (currentStep === 0) nextBtn.innerHTML = 'Start Walk &rarr;';
+      else if (currentStep === STEPS.length - 1) nextBtn.innerHTML = '&#8634; Overview';
+      else nextBtn.innerHTML = 'Next &rarr;';
+
+      animateWalkTo(totalDistance * step.walkRatio);
+
+      if (currentStep === 0) {
+        sightlineGroup.clearLayers();
+        fitOverviewBounds();
+      } else {
+        const focus = step.coords || sliceAt(routeCoords, cumDist, totalDistance * step.walkRatio).point;
+        renderSightline(focus, step.bearing, Boolean(step.isDecision));
+        const offsetLng = map.getSize().x > 700 ? -0.00075 : 0;
+        map.flyTo([focus[0] + 0.0001, focus[1] + offsetLng], step.zoom, { duration: 0.75 });
+      }
+    }
+
+    prevBtn.addEventListener('click', () => { stopAutoPlay(); goToStep(currentStep - 1); });
+    nextBtn.addEventListener('click', () => {
+      stopAutoPlay();
+      goToStep(currentStep === STEPS.length - 1 ? 0 : currentStep + 1);
+    });
+    document.querySelectorAll('.step-pill').forEach((pill) => {
+      pill.addEventListener('click', () => { stopAutoPlay(); goToStep(Number(pill.dataset.step)); });
     });
 
-    document.querySelectorAll('.chip[data-style]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.chip[data-style]').forEach((b) => b.classList.toggle('active', b === btn));
-        document.body.classList.toggle('calm-map', btn.dataset.style !== 'standard');
-      });
+    document.addEventListener('keydown', (e) => {
+      if (document.activeElement && document.activeElement.isContentEditable) return;
+      if (e.key === 'ArrowRight') { stopAutoPlay(); goToStep(currentStep === STEPS.length - 1 ? 0 : currentStep + 1); }
+      else if (e.key === 'ArrowLeft' && currentStep > 0) { stopAutoPlay(); goToStep(currentStep - 1); }
+      else if (e.key === 'Escape') lightboxEl.classList.remove('open');
+    });
+
+    const autoplayBtn = document.getElementById('autoplay-btn');
+    function stopAutoPlay() {
+      if (autoPlayTimer) { clearInterval(autoPlayTimer); autoPlayTimer = null; }
+      autoplayBtn.classList.remove('playing');
+      autoplayBtn.innerHTML = '&#9654; Auto-Play';
+    }
+    autoplayBtn.addEventListener('click', () => {
+      if (autoPlayTimer) { stopAutoPlay(); return; }
+      autoplayBtn.classList.add('playing');
+      autoplayBtn.innerHTML = '&#10074;&#10074; Stop';
+      goToStep(currentStep === STEPS.length - 1 ? 1 : currentStep + 1);
+      autoPlayTimer = setInterval(() => {
+        if (currentStep >= STEPS.length - 1) { stopAutoPlay(); return; }
+        goToStep(currentStep + 1);
+      }, 3200);
+    });
+
+    const optionsBtn = document.getElementById('options-btn');
+    const optionsDrawer = document.getElementById('options-drawer');
+    const cleanBtn = document.getElementById('clean-btn');
+    const radiusSlider = document.getElementById('radius-slider');
+    const radiusReadout = document.getElementById('radius-readout');
+
+    optionsBtn.addEventListener('click', () => {
+      analysisPanel.classList.remove('open');
+      optionsDrawer.classList.toggle('open');
+      syncActiveLegendStrip();
+    });
+    cleanBtn.addEventListener('click', () => {
+      stopAutoPlay();
+      const clean = document.body.classList.toggle('clean-view');
+      cleanBtn.textContent = clean ? 'Show Walk' : 'Clean View';
+      if (clean) {
+        optionsDrawer.classList.remove('open');
+        analysisPanel.classList.remove('open');
+        researchDrawer.classList.remove('open');
+        setPlacingVerifyMode(false);
+        goToStep(0);
+      }
+    });
+
+    function updateRadius(val) {
+      currentRadiusMeters = val;
+      radiusSlider.value = String(val);
+      radiusReadout.textContent = `${val} m`;
+      document.getElementById('header-radius-text').textContent = ringsMode === 'off' ? 'Study area: hidden' : `Study area: ${val} m radius`;
+      startRing.setRadius(val);
+      endRing.setRadius(val);
+      ringEdgeLabel.setLatLng(getRingEastEdge(START_COORDS, val)).setIcon(makeRingLabelIcon(val));
+    }
+
+    radiusSlider.addEventListener('input', (e) => updateRadius(Number(e.target.value)));
+    document.getElementById('radius-snap-btn').addEventListener('click', () => {
+      updateRadius(190);
+      if (currentStep === 0) fitOverviewBounds();
     });
 
     document.querySelectorAll('.chip[data-rings]').forEach((btn) => {
@@ -735,56 +1754,775 @@
         document.querySelectorAll('.chip[data-rings]').forEach((b) => b.classList.toggle('active', b === btn));
         ringsGroup.clearLayers();
         if (ringsMode === 'both') {
-          startRing.addTo(ringsGroup);
-          endRing.addTo(ringsGroup);
-          ringEdgeLabel.addTo(ringsGroup);
+          startRing.addTo(ringsGroup); endRing.addTo(ringsGroup); ringEdgeLabel.addTo(ringsGroup);
           if (!map.hasLayer(ringsGroup)) ringsGroup.addTo(map);
-          document.getElementById('legend-rings').textContent = '190 m radius (exit & gate)';
         } else if (ringsMode === 'start') {
-          startRing.addTo(ringsGroup);
-          ringEdgeLabel.addTo(ringsGroup);
+          startRing.addTo(ringsGroup); ringEdgeLabel.addTo(ringsGroup);
           if (!map.hasLayer(ringsGroup)) ringsGroup.addTo(map);
-          document.getElementById('legend-rings').textContent = '190 m radius from GO exit';
         } else {
           map.removeLayer(ringsGroup);
-          document.getElementById('legend-rings').textContent = '190 m radius (hidden)';
         }
-        fitCleanView();
+        updateRadius(currentRadiusMeters);
+        if (currentStep === 0) fitOverviewBounds();
       });
     });
 
-    document.getElementById('chk-obs').addEventListener('change', (e) => {
-      if (e.target.checked) observationGroup.addTo(map); else map.removeLayer(observationGroup);
-    });
-    document.getElementById('chk-straight').addEventListener('change', (e) => {
-      if (e.target.checked) straightGroup.addTo(map); else map.removeLayer(straightGroup);
-    });
-
-    document.getElementById('fit-btn').addEventListener('click', fitCleanView);
-    document.getElementById('reset-btn').addEventListener('click', () => {
-      document.querySelectorAll('.chip[data-gate]').forEach((b) => b.classList.toggle('active', b.dataset.gate === 'neGate'));
-      startMarker.setLatLng(START_DEFAULT);
-      endMarker.setLatLng(GATE_PRESETS.neGate.coords);
-      endMarker.setTooltipContent(GATE_PRESETS.neGate.name);
-      document.getElementById('legend-end').textContent = GATE_PRESETS.neGate.name;
-      decisionMarker.setLatLng(DECISION_DEFAULT);
-      renderObservationCard();
-      fetchWalkingRoute(true);
+    document.querySelectorAll('.chip[data-style]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.chip[data-style]').forEach((b) => b.classList.toggle('active', b === btn));
+        document.body.classList.toggle('minimal-map', btn.dataset.style !== 'color');
+      });
     });
 
-    startMarker.on('drag', updateStraightAndRings);
-    endMarker.on('drag', updateStraightAndRings);
-    startMarker.on('dragend', () => fetchWalkingRoute(false));
-    endMarker.on('dragend', () => {
-      document.querySelectorAll('.chip[data-gate]').forEach((b) => b.classList.remove('active'));
-      fetchWalkingRoute(false);
-    });
-    decisionMarker.on('drag', () => {
-      if (obsCardMarker) obsCardMarker.setLatLng(decisionMarker.getLatLng());
+    document.getElementById('chk-sightline').addEventListener('change', (e) => {
+      showSightline = e.target.checked;
+      const step = STEPS[currentStep];
+      renderSightline(step.coords, step.bearing, Boolean(step.isDecision));
     });
 
-    renderObservationCard();
-    fetchWalkingRoute(true);
+    async function initRoute() {
+      const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${START_COORDS[1]},${START_COORDS[0]};${END_COORDS[1]},${END_COORDS[0]}?overview=full&geometries=geojson`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const geom = data.routes && data.routes[0] && data.routes[0].geometry;
+        if (!geom || geom.coordinates.length < 2) throw new Error();
+        const latLngs = geom.coordinates.map(([lng, lat]) => [lat, lng]);
+        if (map.distance(START_COORDS, latLngs[0]) <= 20 && map.distance(START_COORDS, latLngs[0]) > 2) latLngs.unshift(START_COORDS);
+        if (map.distance(END_COORDS, latLngs[latLngs.length - 1]) <= 20 && map.distance(END_COORDS, latLngs[latLngs.length - 1]) > 2) latLngs.push(END_COORDS);
+        routeCoords = latLngs;
+      } catch (_) {
+        clearTimeout(timer);
+        routeCoords = [START_COORDS, MID_COORDS, DECISION_COORDS, END_COORDS];
+      }
+
+      cumDist = computeCumDist(routeCoords);
+      totalDistance = cumDist[cumDist.length - 1];
+      routeCasing.setLatLngs(routeCoords);
+      routeDotted.setLatLngs(routeCoords);
+
+      const rounded = Math.round(totalDistance);
+      const mins = Math.max(1, Math.round((totalDistance / WALK_SPEED_MPS) / 60));
+      document.getElementById('header-walk-text').textContent = `Walking path: ${rounded} m`;
+      STEPS[0].badge = `est. ~${mins} min`;
+      STEPS[4].badge = `${rounded} m`;
+
+      const midPt = sliceAt(routeCoords, cumDist, totalDistance * 0.44).point;
+      STEPS[2].coords = midPt;
+      stopMarkers[2].setLatLng(midPt);
+
+      const badgePt = sliceAt(routeCoords, cumDist, totalDistance * 0.38).point;
+      routeMidBadge.setLatLng(badgePt);
+      routeMidBadge.setIcon(L.divIcon({
+        className: '',
+        html: `<div class="route-pill">Walk: ${rounded} m &middot; est. ~${mins} min</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [-16, 0]
+      }));
+
+      goToStep(0);
+    }
+
+    /* =====================================================================
+       ENVIRONMENTAL & SPATIAL ANALYSIS MODULE
+       Built strictly on verified OSM geometry; unverified field attributes
+       are explicitly labelled "Requires Site Verification" and editable.
+       ===================================================================== */
+    const ANALYSIS_STORAGE_EDITS = 'explace_spatial_edits_v1';
+    const ANALYSIS_STORAGE_CUSTOM = 'explace_spatial_custom_v1';
+
+    const ANALYSIS_META = {
+      pedestrian: {
+        label: 'Pedestrian Movement',
+        shortLabel: 'Pedestrian Movement',
+        symbol: '→',
+        color: '#2563eb',
+        stripClass: 'strip-blue',
+        framework: 'Kevin Lynch — Paths',
+        patternDesc: 'Dashed blue route & directional arrows'
+      },
+      landmarks: {
+        label: 'Landmarks & Decision Points',
+        shortLabel: 'Landmarks & Decisions',
+        symbol: '◆',
+        color: '#d97706',
+        stripClass: 'strip-orange',
+        framework: 'Kevin Lynch & Christopher Alexander',
+        patternDesc: 'Orange diamond markers & dotted sightlines'
+      },
+      environmental: {
+        label: 'Environmental Features',
+        shortLabel: 'Environmental Features',
+        symbol: '■',
+        color: '#059669',
+        stripClass: 'strip-green',
+        framework: 'Jan Gehl — Life Between Buildings',
+        patternDesc: 'Green square markers & pedestrian/edge highlights'
+      },
+      barriers: {
+        label: 'Accessibility & Navigation Barriers',
+        shortLabel: 'Accessibility & Barriers',
+        symbol: '▲',
+        color: '#dc2626',
+        stripClass: 'strip-red',
+        framework: 'Accessibility & Spatial Legibility Audit',
+        patternDesc: 'Red triangle markers & alert-dash zones'
+      }
+    };
+
+    // Verified OSM geometry + explicit "Requires Site Verification" research probes
+    const BUILTIN_FEATURES = [
+      // ---- 1. PEDESTRIAN MOVEMENT (BLUE — Kevin Lynch: Paths) ----
+      {
+        id: 'ped-route1-flow',
+        category: 'pedestrian',
+        name: 'Route 1 Primary Corridor (Manitoba Dr → NE Gate)',
+        location: 'Nova Scotia Ave & Nunavut Rd (190 m OSM sidewalk)',
+        framework: 'Kevin Lynch — Paths',
+        coords: [43.63486, -79.41855],
+        geometryType: 'arrows',
+        path: [
+          [43.63530, -79.41876],
+          [43.63486, -79.41855],
+          [43.63428, -79.41822],
+          [43.63408, -79.41760]
+        ],
+        observation: 'Builds on Route 1 (190 m; est. ~3 min depending on pace). Research question: How does pedestrian flow density shift between everyday transit trips and event-day crowds?',
+        opportunity: 'Reinforce continuous visual guidance along the Nova Scotia Ave → Nunavut Rd curve through ground-plane cues or rhythmic lighting.',
+        status: 'Confirmed (OSM)'
+      },
+      {
+        id: 'ped-go-tunnel',
+        category: 'pedestrian',
+        name: 'Exhibition GO South Tunnel Approach',
+        location: 'Exhibition GO South Entrance under Gardiner Expy (43.63580, -79.41872)',
+        framework: 'Kevin Lynch — Paths',
+        coords: [43.63560, -79.41858],
+        geometryType: 'line',
+        path: [
+          [43.635802, -79.418719],
+          [43.635465, -79.418439],
+          [43.63530, -79.41876]
+        ],
+        observation: 'Verified OSM station entrance (node/6147821272) connecting GO rail platforms beneath the Gardiner Expressway to Manitoba Dr. Actual exit split between east/west approaches requires site verification.',
+        opportunity: 'Clarify threshold orientation immediately upon exiting the underpass so visitors spot Nova Scotia Ave without hesitation.',
+        status: 'Confirmed (OSM)'
+      },
+      {
+        id: 'ped-north-plaza',
+        category: 'pedestrian',
+        name: 'BMO Field North Pedestrian Plaza Link',
+        location: 'North edge of BMO Field (OSM highway=pedestrian, 43.63402, -79.41868)',
+        framework: 'Kevin Lynch — Paths',
+        coords: [43.63404, -79.41866],
+        geometryType: 'line',
+        path: [
+          [43.634211, -79.418263],
+          [43.634016, -79.418677],
+          [43.633809, -79.419710]
+        ],
+        observation: 'Verified OSM east–west pedestrian link connecting Nunavut Rd toward the north facade and western lots (~125 m segment). Actual circulation split between this plaza and Nunavut Rd requires site verification.',
+        opportunity: 'Differentiate paths leading to north vs. northeast/east stadium gates through intuitive spatial hierarchy.',
+        status: 'Requires Site Verification'
+      },
+      {
+        id: 'ped-manitoba-loop',
+        category: 'pedestrian',
+        name: 'Manitoba Dr East–West Connector (toward Exhibition Loop)',
+        location: 'Manitoba Dr between Nova Scotia Ave & Exhibition Loop (43.63548, -79.41785)',
+        framework: 'Kevin Lynch — Paths',
+        coords: [43.63548, -79.41785],
+        geometryType: 'line',
+        path: [
+          [43.63530, -79.41876],
+          [43.635465, -79.418439],
+          [43.63558, -79.41735]
+        ],
+        observation: 'Verified OSM sidewalk corridor linking Manitoba Dr & Nova Scotia Ave eastward toward TTC Exhibition Loop (~115 m). Cross-flow volume between TTC streetcars and GO trains requires site verification.',
+        opportunity: 'Coordinate wayfinding transitions for visitors arriving from both Exhibition GO and TTC Exhibition Loop.',
+        status: 'Requires Site Verification'
+      },
+
+      // ---- 2. LANDMARKS & DECISION POINTS (ORANGE — Lynch & Alexander) ----
+      {
+        id: 'lm-go-exit',
+        category: 'landmarks',
+        name: 'Decision Point: Manitoba Dr & Nova Scotia Ave Threshold',
+        location: 'Manitoba Dr at Nova Scotia Ave (43.63530, -79.41876)',
+        framework: 'Kevin Lynch (Nodes) & Christopher Alexander (Entrance Transition)',
+        coords: [43.63530, -79.41876],
+        geometryType: 'sightline',
+        path: [
+          [43.63530, -79.41876],
+          [43.63428, -79.41822],
+          [43.63408, -79.41760]
+        ],
+        observation: 'First street-level orientation node after emerging from the Gardiner underpass. Research question: Is BMO Field visually recognizable from this threshold during both day and evening conditions?',
+        opportunity: 'Frame an unobstructed visual corridor south down Nova Scotia Ave to establish immediate destination confidence.',
+        status: 'Requires Site Verification'
+      },
+      {
+        id: 'lm-nunavut-turn',
+        category: 'landmarks',
+        name: 'Decision Point: Nova Scotia Ave & Nunavut Rd Junction',
+        location: 'Nova Scotia Ave / Nunavut Rd corner (43.63428, -79.41822)',
+        framework: 'Kevin Lynch (Nodes) & Christopher Alexander (Paths & Goals)',
+        coords: [43.63428, -79.41822],
+        geometryType: 'point',
+        observation: 'Key directional split where the route curves east onto Nunavut Rd toward the NE Gate while a pedestrian plaza branches west. Gate-level visual confirmation from the sidewalk requires verification.',
+        opportunity: 'Use architectural sightlines, corner landmark cues, or environmental transitions at this turn to signal gate directions.',
+        status: 'Confirmed (Site Walk)'
+      },
+      {
+        id: 'lm-bmo-field',
+        category: 'landmarks',
+        name: 'Landmark: BMO Field Stadium',
+        location: '170 Princes’ Boulevard (43.63360, -79.41855)',
+        framework: 'Kevin Lynch — Landmarks',
+        coords: [43.63360, -79.41855],
+        geometryType: 'point',
+        observation: 'Primary destination landmark mapped in OSM. Research question: Which parts of the stadium massing and canopy act as the strongest visual anchors along Route 1?',
+        opportunity: 'Leverage the stadium’s vertical canopy and facade rhythm as natural orientation beacons rather than relying solely on pole signs.',
+        status: 'Confirmed (OSM)'
+      },
+      {
+        id: 'lm-food-building',
+        category: 'landmarks',
+        name: 'Landmark: Toronto Star Food Building',
+        location: 'West side of Nova Scotia Ave (43.63462, -79.41925)',
+        framework: 'Kevin Lynch — Landmarks & Edges',
+        coords: [43.63462, -79.41925],
+        geometryType: 'point',
+        observation: 'Large OSM-mapped exhibition hall flanking the west side of Route 1. Research question: Does its long facade help channel movement south or visually screen the stadium until Nunavut Rd?',
+        opportunity: 'Study how the building’s southeast corner acts as a visual reveal point opening onto BMO Field.',
+        status: 'Confirmed (OSM)'
+      },
+      {
+        id: 'lm-horse-palace',
+        category: 'landmarks',
+        name: 'Landmark: Horse Palace & Mounted Police HQ',
+        location: 'East side of Nova Scotia Ave (43.63486, -79.41748)',
+        framework: 'Kevin Lynch — Landmarks & Districts',
+        coords: [43.63486, -79.41748],
+        geometryType: 'point',
+        observation: 'Historic exhibition complex framing the east side of Nova Scotia Ave (OSM verified). Research question: How does its heritage facade contrast with BMO Field’s modern architecture as an orientation landmark?',
+        opportunity: 'Document how contrasting architectural eras help first-time visitors build a mental map of Exhibition Place.',
+        status: 'Confirmed (OSM)'
+      },
+
+      // ---- 3. ENVIRONMENTAL FEATURES (GREEN — Jan Gehl: Life Between Buildings) ----
+      {
+        id: 'env-north-plaza-space',
+        category: 'environmental',
+        name: 'BMO Field North Pedestrian Space & Plaza',
+        location: 'Between Food Building & BMO Field north facade (43.63408, -79.41852)',
+        framework: 'Jan Gehl — Life Between Buildings',
+        coords: [43.63408, -79.41852],
+        geometryType: 'zone',
+        polygon: [
+          [43.63421, -79.41826],
+          [43.63409, -79.41822],
+          [43.63386, -79.41925],
+          [43.63398, -79.41930]
+        ],
+        observation: 'OSM identifies an open pedestrian plaza along BMO Field’s north side. Actual greenery, seating availability, shade, and gathering behaviour are unverified and require site verification.',
+        opportunity: 'Investigate whether micro-plaza landscaping, seating edges, or paving shifts could invite pausing and orientation before gate entry.',
+        status: 'Requires Site Verification'
+      },
+      {
+        id: 'env-food-edge',
+        category: 'environmental',
+        name: 'Food Building East Edge & Sidewalk Interface',
+        location: 'West sidewalk of Nova Scotia Ave (43.63474, -79.41858)',
+        framework: 'Jan Gehl — Soft Edges & Street Life',
+        coords: [43.63474, -79.41858],
+        geometryType: 'edge',
+        path: [
+          [43.63512, -79.41876],
+          [43.63434, -79.41838]
+        ],
+        observation: 'Continuous building edge running parallel to Route 1 (verified OSM footprint). Edge permeability, overhang shelter, surface condition, and street furniture require site verification.',
+        opportunity: 'Evaluate how inactive vs. active building edges affect perceived walking distance and comfort along the 190 m approach.',
+        status: 'Requires Site Verification'
+      },
+      {
+        id: 'env-pavement-transition',
+        category: 'environmental',
+        name: 'Surface Material Transition Audit (Requires Site Verification)',
+        location: 'Nova Scotia Ave / Nunavut Rd sidewalk-to-plaza edge (43.63421, -79.41826)',
+        framework: 'Jan Gehl — Materiality & Tactile Cues',
+        coords: [43.63421, -79.41826],
+        geometryType: 'point',
+        observation: 'OSM tags indicate concrete sidewalks meeting paving-stone plaza near this junction, but actual surface texture, colour contrast, and current wear require on-site verification.',
+        opportunity: 'Assess whether intentional material and colour transitions on the ground plane can cue the east turn toward BMO Field NE Gate.',
+        status: 'Requires Site Verification'
+      },
+      {
+        id: 'env-landscape-audit',
+        category: 'environmental',
+        name: 'Greenery, Shade & Seating Audit (Requires Site Verification)',
+        location: 'Horse Palace / Nova Scotia Ave east frontage (43.63452, -79.41796)',
+        framework: 'Jan Gehl — Life Between Buildings',
+        coords: [43.63452, -79.41796],
+        geometryType: 'point',
+        observation: 'Placeholder research audit point: Do NOT assume trees, planters, or benches exist here. Record verified landscaping, shade cover, and informal seating during site walk.',
+        opportunity: 'Identify where greenery or resting points could soften the hardscape corridor and improve comfort for slower-paced walkers.',
+        status: 'Requires Site Verification'
+      },
+
+      // ---- 4. ACCESSIBILITY & NAVIGATION BARRIERS (RED — Audit & Inquiry) ----
+      {
+        id: 'bar-gardiner-underpass',
+        category: 'barriers',
+        name: 'Gardiner Expressway Underpass Transition (Requires Site Verification)',
+        location: 'Beneath Gardiner Expy north of Manitoba Dr (43.63556, -79.41862)',
+        framework: 'Accessibility & Spatial Legibility Audit',
+        coords: [43.63556, -79.41862],
+        geometryType: 'point',
+        observation: 'Research assumption / inquiry: Overhead expressway structure may create low daylight, acoustic noise, or temporary disorientation when exiting Exhibition GO. Requires site verification.',
+        opportunity: 'Examine lighting contrast, clear exit sightlines, and accessible grade transitions from the station tunnel to Manitoba Dr.',
+        status: 'Requires Site Verification'
+      },
+      {
+        id: 'bar-manitoba-crossing',
+        category: 'barriers',
+        name: 'Manitoba Dr Crosswalk Threshold (Requires Site Verification)',
+        location: 'Manitoba Dr at Nova Scotia Ave (43.63532, -79.41875)',
+        framework: 'Accessibility & Pedestrian Safety Audit',
+        coords: [43.63532, -79.41875],
+        geometryType: 'alert',
+        path: [
+          [43.63538, -79.41879],
+          [43.63526, -79.41872]
+        ],
+        observation: 'OSM maps a ladder crosswalk across Manitoba Dr. Curb ramp slope, tactile warning indicators, signal timing, and vehicle conflicts during events require site verification.',
+        opportunity: 'Verify step-free alignment and visual prominence of the crossing for visitors using mobility aids or navigating crowds.',
+        status: 'Requires Site Verification'
+      },
+      {
+        id: 'bar-nunavut-junction',
+        category: 'barriers',
+        name: 'Nunavut Rd Junction & Block Barrier (Requires Site Verification)',
+        location: 'Nova Scotia Ave / Nunavut Rd corner (43.63427, -79.41815)',
+        framework: 'Accessibility & Wayfinding Clarity Audit',
+        coords: [43.63427, -79.41815],
+        geometryType: 'point',
+        observation: 'OSM maps a barrier=block node (node/9844554606) near this junction where multiple paths converge. Clear wheelchair width, sightline obstructions, and event fencing require site verification.',
+        opportunity: 'Test clearer spatial framing and unobstructed accessible clearances at the turn toward both NE Gate and Gate 1.',
+        status: 'Requires Site Verification'
+      },
+      {
+        id: 'bar-lot853-apron',
+        category: 'barriers',
+        name: 'Parking Lot 853 / Vehicle Apron Edge (Requires Site Verification)',
+        location: 'Nunavut Rd near NE Gate & Lot 853 (43.63404, -79.41748)',
+        framework: 'Accessibility & Pedestrian Separation Audit',
+        coords: [43.63404, -79.41748],
+        geometryType: 'alert',
+        path: [
+          [43.63414, -79.41768],
+          [43.63404, -79.41745]
+        ],
+        observation: 'OSM shows surface parking (Lot 853) bordering the south/east side of Nunavut Rd near the NE Gate approach. Sidewalk continuity, curb transitions, and vehicle separation require site verification.',
+        opportunity: 'Clarify pedestrian-priority edges where the stadium walkway meets adjacent service or parking aprons.',
+        status: 'Requires Site Verification'
+      }
+    ];
+
+    // Load persisted edits & custom "Requires Site Verification" markers
+    let featureEdits = {};
+    let customAnalysisFeatures = [];
+    try { featureEdits = JSON.parse(localStorage.getItem(ANALYSIS_STORAGE_EDITS) || '{}'); } catch (_) {}
+    try { customAnalysisFeatures = JSON.parse(localStorage.getItem(ANALYSIS_STORAGE_CUSTOM) || '[]'); } catch (_) {}
+
+    function saveFeatureEdits() {
+      try { localStorage.setItem(ANALYSIS_STORAGE_EDITS, JSON.stringify(featureEdits)); } catch (_) {}
+    }
+    function saveCustomAnalysis() {
+      try { localStorage.setItem(ANALYSIS_STORAGE_CUSTOM, JSON.stringify(customAnalysisFeatures)); } catch (_) {}
+    }
+
+    function getAllFeatures() {
+      return [...BUILTIN_FEATURES, ...customAnalysisFeatures].map((f) => {
+        const edit = featureEdits[f.id] || {};
+        return { ...f, ...edit };
+      });
+    }
+
+    // Independent Leaflet layer groups (ALL OFF by default to preserve clean base map view!)
+    const analysisLayerGroups = {
+      pedestrian: L.featureGroup(),
+      landmarks: L.featureGroup(),
+      environmental: L.featureGroup(),
+      barriers: L.featureGroup()
+    };
+    const activeAnalysisLayers = {
+      pedestrian: false,
+      landmarks: false,
+      environmental: false,
+      barriers: false
+    };
+
+    let selectedFeatureId = null;
+    let isPlacingVerifyMarker = false;
+
+    const analysisBtn = document.getElementById('analysis-btn');
+    const analysisPanel = document.getElementById('analysis-panel');
+    const closeAnalysisBtn = document.getElementById('close-analysis-btn');
+    const layerCountPill = document.getElementById('layer-count-pill');
+    const dynamicLegendBody = document.getElementById('dynamic-legend-body');
+    const activeLegendStrip = document.getElementById('active-legend-strip');
+    const stripChips = document.getElementById('strip-chips');
+    const verifyAddBox = document.getElementById('verify-add-box');
+    const verifyCatSelect = document.getElementById('verify-cat-select');
+    const btnAddVerify = document.getElementById('btn-add-verify');
+    const resetMapBtn = document.getElementById('reset-map-btn');
+
+    const researchDrawer = document.getElementById('research-drawer');
+    const closeResearchBtn = document.getElementById('close-research-btn');
+    const rdCatPill = document.getElementById('rd-cat-pill');
+    const rdTitle = document.getElementById('rd-title');
+    const rdLocation = document.getElementById('rd-location');
+    const rdCategory = document.getElementById('rd-category');
+    const rdFramework = document.getElementById('rd-framework');
+    const rdObservation = document.getElementById('rd-observation');
+    const rdOpportunity = document.getElementById('rd-opportunity');
+    const rdStatusSelect = document.getElementById('rd-status-select');
+    const rdStatusBadge = document.getElementById('rd-status-badge');
+    const rdDeleteBtn = document.getElementById('rd-delete-btn');
+
+    function isUnverifiedStatus(status) {
+      return status === 'Requires Site Verification' || status === 'Research Assumption';
+    }
+
+    function createAnalyticalMarkerIcon(category, status) {
+      const meta = ANALYSIS_META[category];
+      const verifyRing = isUnverifiedStatus(status) ? '<span class="am-verify-ring" title="Requires Site Verification"></span>' : '';
+      let inner = '';
+      if (category === 'pedestrian') inner = `<div class="am-shape am-pedestrian">${meta.symbol}</div>`;
+      else if (category === 'landmarks') inner = `<div class="am-shape am-landmarks"><span>${meta.symbol}</span></div>`;
+      else if (category === 'environmental') inner = `<div class="am-shape am-environmental">${meta.symbol}</div>`;
+      else inner = `<div class="am-shape am-barriers">!</div>`;
+      return L.divIcon({
+        className: '',
+        html: `<div class="am-wrap">${verifyRing}${inner}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+    }
+
+    function bearingDegBetween(a, b) {
+      const lat1 = a[0] * Math.PI / 180;
+      const lat2 = b[0] * Math.PI / 180;
+      const dLng = (b[1] - a[1]) * Math.PI / 180;
+      const y = Math.sin(dLng) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+    function rebuildAnalysisLayers() {
+      Object.values(analysisLayerGroups).forEach((g) => g.clearLayers());
+      const features = getAllFeatures();
+
+      features.forEach((f) => {
+        const group = analysisLayerGroups[f.category];
+        const meta = ANALYSIS_META[f.category];
+        if (!group || !meta) return;
+
+        // 1. Render supporting spatial geometry (paths, arrows, sightlines, edges, zones)
+        if (f.geometryType === 'arrows' && Array.isArray(f.path)) {
+          for (let i = 0; i < f.path.length - 1; i++) {
+            const p1 = f.path[i];
+            const p2 = f.path[i + 1];
+            const mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+            const rot = Math.round(bearingDegBetween(p1, p2) - 90);
+            const arrowIcon = L.divIcon({
+              className: '',
+              html: `<div class="dir-chevron" style="transform:rotate(${rot}deg)">&#10148;</div>`,
+              iconSize: [18, 18],
+              iconAnchor: [9, 9]
+            });
+            L.marker(mid, { icon: arrowIcon, zIndexOffset: 340 })
+              .bindTooltip(`${f.name} (click to inspect)`, { direction: 'top', offset: [0, -8] })
+              .on('click', () => openResearchPanel(f.id))
+              .addTo(group);
+          }
+        } else if (f.geometryType === 'line' && Array.isArray(f.path)) {
+          L.polyline(f.path, {
+            color: meta.color, weight: 4, opacity: 0.82, dashArray: '8 6'
+          }).on('click', () => openResearchPanel(f.id)).addTo(group);
+        } else if (f.geometryType === 'sightline' && Array.isArray(f.path)) {
+          L.polyline(f.path, {
+            color: meta.color, weight: 3, opacity: 0.8, dashArray: '2 7'
+          }).on('click', () => openResearchPanel(f.id)).addTo(group);
+        } else if (f.geometryType === 'edge' && Array.isArray(f.path)) {
+          L.polyline(f.path, {
+            color: meta.color, weight: 5, opacity: 0.78
+          }).on('click', () => openResearchPanel(f.id)).addTo(group);
+        } else if (f.geometryType === 'zone' && Array.isArray(f.polygon)) {
+          L.polygon(f.polygon, {
+            color: meta.color, weight: 2, dashArray: '5 4', fillColor: meta.color, fillOpacity: 0.16
+          }).on('click', () => openResearchPanel(f.id)).addTo(group);
+        } else if (f.geometryType === 'alert' && Array.isArray(f.path)) {
+          L.polyline(f.path, {
+            color: meta.color, weight: 5, opacity: 0.85, dashArray: '5 5'
+          }).on('click', () => openResearchPanel(f.id)).addTo(group);
+        }
+
+        // 2. Render clickable accessible feature marker
+        const marker = L.marker(f.coords, {
+          icon: createAnalyticalMarkerIcon(f.category, f.status),
+          draggable: Boolean(f.isCustom),
+          zIndexOffset: 420
+        }).addTo(group);
+
+        marker.bindTooltip(`${meta.symbol} ${f.name} · ${f.status}`, {
+          direction: 'top',
+          offset: [0, -12]
+        });
+
+        marker.on('click', () => openResearchPanel(f.id));
+
+        if (f.isCustom) {
+          marker.on('dragend', () => {
+            const ll = marker.getLatLng();
+            const target = customAnalysisFeatures.find((c) => c.id === f.id);
+            if (target) {
+              target.coords = [ll.lat, ll.lng];
+              target.location = `Custom field point (${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)})`;
+              saveCustomAnalysis();
+              if (selectedFeatureId === f.id) openResearchPanel(f.id);
+            }
+          });
+        }
+      });
+    }
+
+    function updateStatusBadgeUI(status) {
+      rdStatusBadge.className = 'status-badge';
+      if (status.startsWith('Confirmed')) {
+        rdStatusBadge.classList.add('status-confirmed');
+        rdStatusBadge.textContent = 'Verified';
+      } else if (status === 'Research Assumption') {
+        rdStatusBadge.classList.add('status-assumption');
+        rdStatusBadge.textContent = 'Assumption';
+      } else {
+        rdStatusBadge.classList.add('status-verify');
+        rdStatusBadge.textContent = 'Verify On-Site';
+      }
+    }
+
+    function openResearchPanel(featureId) {
+      const feature = getAllFeatures().find((f) => f.id === featureId);
+      if (!feature) return;
+      selectedFeatureId = featureId;
+      const meta = ANALYSIS_META[feature.category];
+
+      researchDrawer.className = `research-drawer interactive-only open cat-${feature.category}`;
+      rdCatPill.className = `rd-cat-pill ${meta.stripClass}`;
+      rdCatPill.textContent = `${meta.symbol} ${meta.label}`;
+      rdTitle.textContent = feature.name;
+      rdLocation.textContent = feature.location;
+      rdCategory.textContent = meta.label;
+      rdFramework.textContent = feature.framework;
+      rdObservation.textContent = feature.observation;
+      rdOpportunity.textContent = feature.opportunity;
+      rdStatusSelect.value = feature.status;
+      updateStatusBadgeUI(feature.status);
+      rdDeleteBtn.classList.toggle('visible', Boolean(feature.isCustom));
+
+      // Collapse top-right analysis panel on narrower viewports so research panel has clean room
+      if (window.innerWidth < 1100) {
+        analysisPanel.classList.remove('open');
+        syncActiveLegendStrip();
+      }
+    }
+
+    function persistSelectedEdit(field, value) {
+      if (!selectedFeatureId) return;
+      const customTarget = customAnalysisFeatures.find((c) => c.id === selectedFeatureId);
+      if (customTarget) {
+        customTarget[field] = value;
+        saveCustomAnalysis();
+      } else {
+        if (!featureEdits[selectedFeatureId]) featureEdits[selectedFeatureId] = {};
+        featureEdits[selectedFeatureId][field] = value;
+        saveFeatureEdits();
+      }
+      if (field === 'status' || field === 'name') rebuildAnalysisLayers();
+    }
+
+    rdTitle.addEventListener('input', () => persistSelectedEdit('name', rdTitle.textContent.trim() || 'Untitled Feature'));
+    rdObservation.addEventListener('input', () => persistSelectedEdit('observation', rdObservation.textContent.trim()));
+    rdOpportunity.addEventListener('input', () => persistSelectedEdit('opportunity', rdOpportunity.textContent.trim()));
+    rdStatusSelect.addEventListener('change', () => {
+      updateStatusBadgeUI(rdStatusSelect.value);
+      persistSelectedEdit('status', rdStatusSelect.value);
+    });
+
+    rdDeleteBtn.addEventListener('click', () => {
+      if (!selectedFeatureId) return;
+      customAnalysisFeatures = customAnalysisFeatures.filter((c) => c.id !== selectedFeatureId);
+      saveCustomAnalysis();
+      selectedFeatureId = null;
+      researchDrawer.classList.remove('open');
+      rebuildAnalysisLayers();
+    });
+
+    closeResearchBtn.addEventListener('click', () => {
+      selectedFeatureId = null;
+      researchDrawer.classList.remove('open');
+    });
+
+    function syncActiveLegendStrip() {
+      const activeKeys = Object.keys(activeAnalysisLayers).filter((k) => activeAnalysisLayers[k]);
+      const count = activeKeys.length;
+      layerCountPill.textContent = String(count);
+      layerCountPill.classList.toggle('hidden', count === 0);
+      analysisBtn.classList.toggle('analysis-active', count > 0 || analysisPanel.classList.contains('open'));
+
+      // Dynamic legend inside panel
+      if (count === 0) {
+        dynamicLegendBody.className = 'legend-empty';
+        dynamicLegendBody.textContent = 'Base map view — toggle a layer above to display analytical overlays.';
+      } else {
+        dynamicLegendBody.className = 'legend-items';
+        dynamicLegendBody.innerHTML = activeKeys.map((k) => {
+          const m = ANALYSIS_META[k];
+          return `<div class="legend-entry">
+            <span class="legend-symbol-tag" style="color:${m.color}">${m.symbol}</span>
+            <span><strong>${m.shortLabel}:</strong> ${m.patternDesc}</span>
+          </div>`;
+        }).join('');
+      }
+
+      // Compact legend strip below top-left pill when panel is closed and ≥1 layer is active
+      if (count > 0 && !analysisPanel.classList.contains('open')) {
+        stripChips.innerHTML = activeKeys.map((k) => {
+          const m = ANALYSIS_META[k];
+          return `<span class="strip-chip ${m.stripClass}">${m.symbol} ${m.shortLabel}</span>`;
+        }).join('');
+        activeLegendStrip.classList.add('visible');
+      } else {
+        activeLegendStrip.classList.remove('visible');
+      }
+    }
+
+    function setAnalysisLayer(key, enabled) {
+      activeAnalysisLayers[key] = enabled;
+      const checkbox = document.querySelector(`input[data-analysis-layer="${key}"]`);
+      const row = document.getElementById(`row-${key}`);
+      if (checkbox) checkbox.checked = enabled;
+      if (row) row.classList.toggle(`on-${key}`, enabled);
+
+      if (enabled) {
+        if (!map.hasLayer(analysisLayerGroups[key])) analysisLayerGroups[key].addTo(map);
+      } else {
+        if (map.hasLayer(analysisLayerGroups[key])) map.removeLayer(analysisLayerGroups[key]);
+      }
+      syncActiveLegendStrip();
+    }
+
+    document.querySelectorAll('input[data-analysis-layer]').forEach((chk) => {
+      chk.addEventListener('change', (e) => setAnalysisLayer(chk.dataset.analysisLayer, e.target.checked));
+    });
+
+    analysisBtn.addEventListener('click', () => {
+      optionsDrawer.classList.remove('open');
+      analysisPanel.classList.toggle('open');
+      if (!analysisPanel.classList.contains('open')) setPlacingVerifyMode(false);
+      syncActiveLegendStrip();
+    });
+
+    closeAnalysisBtn.addEventListener('click', () => {
+      analysisPanel.classList.remove('open');
+      setPlacingVerifyMode(false);
+      syncActiveLegendStrip();
+    });
+
+    document.getElementById('btn-all-layers').addEventListener('click', () => {
+      Object.keys(activeAnalysisLayers).forEach((k) => setAnalysisLayer(k, true));
+    });
+
+    document.getElementById('btn-clear-layers').addEventListener('click', () => {
+      Object.keys(activeAnalysisLayers).forEach((k) => setAnalysisLayer(k, false));
+      researchDrawer.classList.remove('open');
+      selectedFeatureId = null;
+    });
+
+    function setPlacingVerifyMode(enabled) {
+      isPlacingVerifyMarker = enabled;
+      document.body.classList.toggle('placing-verify-marker', enabled);
+      verifyAddBox.classList.toggle('open', enabled);
+      btnAddVerify.textContent = enabled ? 'Cancel Pin' : '+ Verification Pin';
+    }
+
+    btnAddVerify.addEventListener('click', () => setPlacingVerifyMode(!isPlacingVerifyMarker));
+
+    map.on('click', (e) => {
+      if (!isPlacingVerifyMarker) return;
+      const cat = verifyCatSelect.value || 'environmental';
+      const meta = ANALYSIS_META[cat];
+      const id = 'custom-' + Date.now();
+      const newFeature = {
+        id,
+        isCustom: true,
+        category: cat,
+        name: 'Requires Site Verification — Field Observation',
+        location: `Exhibition Place (${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)})`,
+        framework: meta.framework,
+        coords: [e.latlng.lat, e.latlng.lng],
+        geometryType: 'point',
+        observation: 'Unverified site condition — click to record observed materials, landscaping, visibility, or accessibility conditions.',
+        opportunity: 'Click to note a potential environmental wayfinding design opportunity.',
+        status: 'Requires Site Verification'
+      };
+      customAnalysisFeatures.push(newFeature);
+      saveCustomAnalysis();
+      rebuildAnalysisLayers();
+      setAnalysisLayer(cat, true);
+      setPlacingVerifyMode(false);
+      openResearchPanel(id);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isPlacingVerifyMarker) setPlacingVerifyMode(false);
+    });
+
+    // Reset Map button — restores base map view, overview zoom, 190 m study radius, and clears analytical overlays
+    resetMapBtn.addEventListener('click', () => {
+      stopAutoPlay();
+      setPlacingVerifyMode(false);
+      Object.keys(activeAnalysisLayers).forEach((k) => setAnalysisLayer(k, false));
+      analysisPanel.classList.remove('open');
+      optionsDrawer.classList.remove('open');
+      researchDrawer.classList.remove('open');
+      selectedFeatureId = null;
+
+      ringsMode = 'start';
+      document.querySelectorAll('.chip[data-rings]').forEach((b) => b.classList.toggle('active', b.dataset.rings === 'start'));
+      ringsGroup.clearLayers();
+      startRing.addTo(ringsGroup);
+      ringEdgeLabel.addTo(ringsGroup);
+      if (!map.hasLayer(ringsGroup)) ringsGroup.addTo(map);
+      updateRadius(190);
+
+      document.querySelectorAll('.chip[data-style]').forEach((b) => b.classList.toggle('active', b.dataset.style === 'minimal'));
+      document.body.classList.add('minimal-map');
+      showSightline = true;
+      document.getElementById('chk-sightline').checked = true;
+
+      syncActiveLegendStrip();
+      goToStep(0);
+    });
+
+    rebuildAnalysisLayers();
+    syncActiveLegendStrip();
+    initRoute();
   </script>
 </body>
 </html>
